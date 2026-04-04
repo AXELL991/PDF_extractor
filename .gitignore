@@ -210,3 +210,6 @@ __marimo__/
 .vscode/
 *.code-workspace
 
+# Archivos de configuración y llaves secretas
+.env
+.venv/
