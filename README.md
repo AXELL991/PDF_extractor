@@ -7,7 +7,6 @@ Extraer texto de un pdf que es proporcionado por el usuario. Después se hace un
 - UV
 - Modelo de IA (a definir)
 - Ollama (opcional, a definir a futuro)
-- xD
 - Base de datos no relacional MongoDB
 
 ## Metodologías: 
