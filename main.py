@@ -29,7 +29,7 @@ class OllamaSummarizer(AISummarizer):
     def summarize(self, text: str) -> str:
         # TODO: Implementar llamada HTTP al modelo o Ollama
         print(f"[*] Resumiendo texto usando {self.model_name} en {self.api_url}...")
-        return "Este es un resumen generado por IA."
+        return "Este es un resumen generado por Cerda Santiago."
 
 class MongoDatabase(Database):
     def __init__(self, uri: str, db_name: str):
