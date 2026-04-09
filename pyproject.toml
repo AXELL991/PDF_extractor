@@ -1,7 +1,19 @@
 [project]
 name = "pdf-extractext"
 version = "0.1.0"
-description = "Add your description here"
+description = "Herramienta en Python para extraer texto de PDFs y generar resúmenes con Inteligencia Artificial."
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pypdf>=4.0.0",          # Para la extracción de texto del PDF
+    "pymongo>=4.6.0",        # Para la conexión con la base de datos NoSQL
+    "python-dotenv>=1.0.0",  # Para gestionar configuraciones vía entorno (12 Factor)
+    "requests>=2.31.0",      # Para conectarse a la API del modelo de IA/Ollama
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",         # Fundamental para aplicar la metodología TDD
+    "pytest-mock>=3.12.0",   # Para simular llamadas a la BD o a la IA en los tests
+    "ruff>=0.3.0",           # Linter y formateador de código (KISS / DRY)
+]
