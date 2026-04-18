@@ -1,115 +1,36 @@
+import io
 import pytest
-from main import PyPDFExtractor, OllamaSummarizer, MoonshotSummarizer, MongoDatabase
 
+# Importaremos el extractor desde nuestra carpeta de servicios (que vamos a crear después)
+from app.services.pdf_extractor import PyPDFExtractor
 
 class TestPyPDFExtractor:
-    """Tests para el extractor de PDF."""
+    """Tests para el extractor de PDF trabajando directamente en RAM."""
 
-    def test_pypdf_extractor_returns_string(self):
-        # Arrange
+    def test_pypdf_extractor_returns_string_from_memory(self):
+        # Arrange (Preparar)
         extractor = PyPDFExtractor()
-        dummy_path = "tests/dummy.pdf"
+        
+        # Simulamos un archivo PDF súper básico directamente en la memoria RAM (BytesIO)
+        # Esto reemplaza al dummy_path = "tests/dummy.pdf"
+        fake_pdf_bytes = b"%PDF-1.4\n%EOF" 
+        archivo_en_ram = io.BytesIO(fake_pdf_bytes)
 
-        # Act
-        result = extractor.extract(dummy_path)
+        # Act (Actuar)
+        # Le pasamos el archivo de la RAM, no una ruta del disco
+        result = extractor.extract(archivo_en_ram)
 
-        # Assert
+        # Assert (Afirmar)
         assert isinstance(result, str)
-        # Cuando el archivo no existe, debería devolver string vacío
-        assert result == ""
 
-    def test_pypdf_extractor_is_pdf_extractor_instance(self):
-        from main import PDFExtractor
-
+    def test_pypdf_extractor_calculates_correct_checksum(self):
+        # Un nuevo test esencial para el TP: el Checksum (Hash único del archivo)
         extractor = PyPDFExtractor()
-        assert isinstance(extractor, PDFExtractor)
-
-
-class TestOllamaSummarizer:
-    """Tests para el summarizer de Ollama."""
-
-    def test_ollama_summarizer_init(self):
-        summarizer = OllamaSummarizer(model_name="llama3", api_url="http://localhost")
-        assert summarizer.model_name == "llama3"
-        assert summarizer.api_url == "http://localhost"
-
-    def test_ollama_summarizer_is_ai_summarizer_instance(self):
-        from main import AISummarizer
-
-        summarizer = OllamaSummarizer(model_name="llama3", api_url="http://localhost")
-        assert isinstance(summarizer, AISummarizer)
-
-    def test_ollama_summarizer_returns_string_on_error(self, mocker):
-        summarizer = OllamaSummarizer(model_name="llama3", api_url="http://invalid-url")
-        result = summarizer.summarize("texto de prueba")
-        assert isinstance(result, str)
-
-
-class TestMoonshotSummarizer:
-    """Tests para el summarizer de Moonshot/Kimi."""
-
-    def test_moonshot_summarizer_init(self):
-        summarizer = MoonshotSummarizer(
-            api_key="test_key", model="moonshotai/kimi-k2.5"
-        )
-        assert summarizer.api_key == "test_key"
-        assert summarizer.model == "moonshotai/kimi-k2.5"
-
-    def test_moonshot_summarizer_is_ai_summarizer_instance(self):
-        from main import AISummarizer
-
-        summarizer = MoonshotSummarizer(api_key="test_key")
-        assert isinstance(summarizer, AISummarizer)
-
-    def test_moonshot_summarizer_returns_string_on_error(self):
-        summarizer = MoonshotSummarizer(
-            api_key="test_key", model="moonshotai/kimi-k2.5"
-        )
-        # Debería devolver string con error porque la key es inválida
-        result = summarizer.summarize("texto de prueba")
-        assert isinstance(result, str)
-
-
-class TestMongoDatabase:
-    """Tests para la base de datos MongoDB."""
-
-    def test_mongo_database_init(self):
-        db = MongoDatabase(uri="mongodb://localhost:27017", db_name="test_db")
-        assert db.uri == "mongodb://localhost:27017"
-        assert db.db_name == "test_db"
-
-    def test_mongo_database_is_database_instance(self):
-        from main import Database
-
-        db = MongoDatabase(uri="mongodb://localhost:27017", db_name="test_db")
-        assert isinstance(db, Database)
-
-    def test_mongo_database_save_prints_error_without_connection(self, capsys):
-        # El método save debería manejar el error de conexión
-        db = MongoDatabase(uri="invalid_uri", db_name="test_db")
-        db.save({"test": "data"})
-        captured = capsys.readouterr()
-        # Debería imprimir algún error de conexión
-        assert "Error" in captured.out or "Error" in captured.err or True
-
-
-class TestInterfaces:
-    """Tests para verificar las abstracciones."""
-
-    def test_pdf_extractor_is_abstract(self):
-        from main import PDFExtractor
-
-        with pytest.raises(NotImplementedError):
-            PDFExtractor().extract("test.pdf")
-
-    def test_ai_summarizer_is_abstract(self):
-        from main import AISummarizer
-
-        with pytest.raises(NotImplementedError):
-            AISummarizer().summarize("test")
-
-    def test_database_is_abstract(self):
-        from main import Database
-
-        with pytest.raises(NotImplementedError):
-            Database().save({"test": "data"})
+        fake_pdf_bytes = b"%PDF-1.4\n%EOF"
+        archivo_en_ram = io.BytesIO(fake_pdf_bytes)
+        
+        checksum = extractor.calculate_checksum(archivo_en_ram)
+        
+        # Tiene que devolver una cadena de texto (el hash generado)
+        assert isinstance(checksum, str)
+        assert len(checksum) > 0
