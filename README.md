@@ -66,7 +66,7 @@ Siguiendo la metodología de Desarrollo Orientado a Pruebas:
 
 ```bash
 # Ejecutar suite de tests
-python -m pytest
+uv run pytest
 ```
 
 ---
