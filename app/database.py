@@ -27,6 +27,21 @@ class MongoRepository:
         }
         return self.coleccion.insert_one(documento)
 
+    def actualizar_nombre(self, checksum: str, nuevo_nombre: str):
+        """Actualiza el nombre de un documento."""
+        return self.coleccion.update_one(
+            {"hash_seguridad": checksum},
+            {"$set": {"archivo": nuevo_nombre}}
+        )
+
+    def eliminar_documento(self, checksum: str):
+        """Elimina un documento por su hash."""
+        return self.coleccion.delete_one({"hash_seguridad": checksum})
+
+    def existe_documento(self, checksum: str) -> bool:
+        """Verifica si existe un documento con el hash dado."""
+        return self.coleccion.find_one({"hash_seguridad": checksum}) is not None
+
     def listar_todos(self):
         """Para el CRUD: lista todos los documentos."""
         return list(self.coleccion.find({}, {"_id": 0})) # El 0 oculta el ID feo de Mongo
