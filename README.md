@@ -8,6 +8,11 @@
 API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**. Se encarga de la extracción de texto de documentos PDF, validación de integridad y persistencia en base de datos NoSQL.
 
 ---
+## Integrantes - Legajo
+ * Puita axel 10903
+ * Cerda Santiago 10802
+ * Serpa Juan Cruz 10938
+---
 
 ## 🛠️ Funcionalidades Implementadas (Rúbrica Etapa 1)
 
