@@ -26,7 +26,6 @@ API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**.
 
 * Python 3.11+
 * Docker Desktop (para el motor de base de datos)
-* MongoBD Compass (para la base de datos)
 * [uv](https://docs.astral.sh/uv/) (Recomendado para gestión de entorno)
 
 ### 2. Configuración del Entorno (en terminal de visual studio)
