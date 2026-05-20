@@ -11,7 +11,7 @@ API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**.
 
 ## Integrantes - Legajo
 
-* Puita Axel 10903
+* Puita axel 10903
 * Cerda Santiago 10802
 * Serpa Juan Cruz 10938
 
@@ -34,25 +34,25 @@ API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**.
 
 El proyecto sigue una **arquitectura en capas** simple pero efectiva:
 
-```text
+```
 ┌─────────────────────────────────────────┐
 │           CAPA DE PRESENTACIÓN          │
-│                (main.py)                │
+│              (main.py)                  │
 │     - Endpoints FastAPI                 │
 │     - Validaciones de entrada           │
 │     - Manejo de excepciones             │
 └──────────────────┬──────────────────────┘
                    │
 ┌──────────────────▼──────────────────────┐
-│             CAPA DE NEGOCIO             │
-│        (services/pdf_extractor.py)      │
+│           CAPA DE NEGOCIO               │
+│      (services/pdf_extractor.py)        │
 │     - Extracción de texto PDF           │
 │     - Generación de checksum SHA-256    │
 └──────────────────┬──────────────────────┘
                    │
 ┌──────────────────▼──────────────────────┐
-│              CAPA DE DATOS              │
-│          (database.py)                  │
+│           CAPA DE DATOS                 │
+│         (database.py)                   │
 │     - Conexión MongoDB                  │
 │     - Operaciones CRUD                  │
 └─────────────────────────────────────────┘
@@ -60,121 +60,8 @@ El proyecto sigue una **arquitectura en capas** simple pero efectiva:
 
 ### Componentes Adicionales
 
-- **DTOs** (`dtos.py`): Objetos de transferencia de datos con Pydantic.
-- **Excepciones** (`exceptions.py`): Errores del dominio (FormatoInvalido, DocumentoDuplicado, etc.).
-
-### 🔄 Flujo de Trabajo (Diagrama de Secuencia)
-
-A continuación se detalla cómo interactúan los componentes del sistema durante las operaciones principales:
-
-```mermaid
-sequenceDiagram
-    actor User as Usuario/Cliente
-    participant API as API FastAPI<br/>(main.py)
-    participant Service as PyPDFExtractor<br/>(pdf_extractor.py)
-    participant DB as MongoRepository<br/>(database.py)
-    participant Mongo as MongoDB
-
-    %% == Flujo Principal: Subir y Procesar un PDF ==
-    Note over User, Mongo: Flujo Principal: Subir y Procesar un PDF
-
-    User->>+API: POST /upload (PDF)
-    
-    alt Formato invalido
-        API-->>User: 400 Bad Request: El archivo proporcionado no es PDF.
-    else Formato valido
-        Note right of API: Verifica que el archivo<br/>termine en ".pdf"
-        
-        alt Archivo muy grande
-            API-->>User: 413 Payload Too Large: El archivo supera los 5MB.
-        else Tamaño valido
-            Note right of API: Verifica que el tamaño<br/>sea menor a 5MB
-            
-            API->>API: Leer bytes del archivo en RAM
-            Note right of API: io.BytesIO guarda el archivo<br/>en memoria sin usar disco
-            
-            API->>+Service: calculate_checksum(bytes)
-            Service->>Service: file.seek(0) + sha256
-            Service-->>-API: checksum SHA-256
-            
-            API->>+DB: obtener_por_checksum(checksum)
-            DB->>+Mongo: find_one({"hash_seguridad": ...})
-            Mongo-->>-DB: documento
-            DB-->>-API: documento o None
-            
-            alt Documento duplicado
-                API-->>User: 409 Conflict: Este PDF ya fue procesado.
-            else Documento nuevo
-                API->>+Service: extract(bytes)
-                Service->>Service: PdfReader(pages) -> texto
-                Service-->>-API: texto_extraido
-                
-                API->>+DB: guardar_documento(nombre, texto, checksum)
-                DB->>+Mongo: insert_one(documento)
-                Mongo-->>-DB: resultado insert
-                DB-->>-API: resultado
-                
-                API-->>User: 200 OK: UploadResponse
-                Note right of API: {<br/>  "status": "success",<br/>  "message": "Documento procesado",<br/>  "filename": "...",<br/>  "sha256": "..."<br/>}
-            end
-        end
-    end
-    deactivate API
-
-    %% == Operaciones CRUD Adicionales ==
-    Note over User, Mongo: Operaciones CRUD Adicionales
-
-    User->>+API: GET /documentos
-    API->>+DB: listar_todos()
-    DB->>+Mongo: find({}, {"_id": 0})
-    Mongo-->>-DB: lista documentos
-    DB-->>-API: documentos
-    API-->>-User: 200 OK: {total, documentos}
-
-    User->>+API: GET /documentos/{checksum}
-    API->>+DB: obtener_por_checksum(checksum)
-    DB->>+Mongo: find_one({...})
-    Mongo-->>-DB: documento o None
-    DB-->>-API: documento
-    
-    alt Documento no encontrado
-        API-->>User: 404 Not Found
-    else Documento encontrado
-        API-->>User: 200 OK: documento
-    end
-
-    User->>+API: PUT /documentos/{checksum} (nuevo_nombre)
-    API->>+DB: obtener_por_checksum(checksum)
-    DB->>+Mongo: find_one({...})
-    Mongo-->>-DB: documento
-    DB-->>-API: documento
-    
-    alt Documento no encontrado
-        API-->>User: 404 Not Found
-    else Documento encontrado
-        API->>+DB: actualizar_nombre(checksum, nuevo_nombre)
-        DB->>+Mongo: update_one({...}, {$set: {...}})
-        Mongo-->>-DB: resultado
-        DB-->>-API: resultado
-        API-->>User: 200 OK: Nombre actualizado
-    end
-
-    User->>+API: DELETE /documentos/{checksum}
-    API->>+DB: obtener_por_checksum(checksum)
-    DB->>+Mongo: find_one({...})
-    Mongo-->>-DB: documento
-    DB-->>-API: documento
-    
-    alt Documento no encontrado
-        API-->>User: 404 Not Found
-    else Documento encontrado
-        API->>+DB: eliminar_documento(checksum)
-        DB->>+Mongo: delete_one({...})
-        Mongo-->>-DB: resultado
-        DB-->>-API: resultado
-        API-->>User: 200 OK: Documento eliminado
-    end
-```
+- **DTOs** (`dtos.py`): Objetos de transferencia de datos con Pydantic
+- **Excepciones** (`exceptions.py`): Errores del dominio (FormatoInvalido, DocumentoDuplicado, etc.)
 
 ---
 
