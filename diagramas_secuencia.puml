@@ -1,7 +1,9 @@
 @startuml
 
 !theme plain
+
 skinparam sequenceArrowThickness 2
+
 skinparam sequence {
     ArrowColor #333333
     LifeLineBorderColor #666666
@@ -37,160 +39,272 @@ skinparam participant {
 
 title Diagrama de Secuencia - API Extractor de PDFs
 
-center [bold]Flujo Principal: Subir y Procesar un PDF[/bold]
-
 actor "Usuario/Cliente" as User
 participant "API FastAPI\n(main.py)" as API <<External>>
 participant "PyPDFExtractor\n(pdf_extractor.py)" as Service <<Service>>
 participant "MongoRepository\n(database.py)" as DB <<Storage>>
 database "MongoDB" as Mongo
 
+== Flujo Principal: Subir y Procesar un PDF ==
+
 User -> API : POST /upload (PDF)
 activate API #E3F2FD
 
-    API -> API : validar_formato(filename)
-    note right
-      Verifica que el archivo
-      termine en ''.pdf''
-    end note
-    alt Formato inválido
-        API --> User : 400 Bad Request: "El archivo proporcionado no es PDF."
-        deactivate API
-    end
+alt Formato invalido
+    API --> User : "400 Bad Request: El archivo proporcionado no es PDF."
 
-    API -> API : validar_tamaño(file)
-    note right
-      Verifica que el tamaño
-      sea menor a 5MB
+else Formato valido
+
+    note right of API
+        Verifica que el archivo
+        termine en ".pdf"
     end note
+
     alt Archivo muy grande
-        API --> User : 413 Payload Too Large: "El archivo supera los 5MB."
-        deactivate API
-    end
 
-    API -> API : Leer bytes del archivo en RAM
-    note right
-      io.BytesIO guarda el archivo
-      en memoria (sin disco)
-    end note
+        API --> User : "413 Payload Too Large: El archivo supera los 5MB."
 
-    API -> Service : calculate_checksum(bytes)
-    activate Service #E8F5E9
+    else Tamano valido
+
+        note right of API
+            Verifica que el tamano
+            sea menor a 5MB
+        end note
+
+        API -> API : Leer bytes del archivo en RAM
+
+        note right of API
+            io.BytesIO guarda el archivo
+            en memoria sin usar disco
+        end note
+
+        API -> Service : calculate_checksum(bytes)
+
+        activate Service #E8F5E9
+
         Service -> Service : file.seek(0) + sha256
+
         Service --> API : checksum SHA-256
-    deactivate Service
 
-    API -> DB : obtener_por_checksum(checksum)
-    activate DB #E1F5FE
+        deactivate Service
+
+        API -> DB : obtener_por_checksum(checksum)
+
+        activate DB #E1F5FE
+
         DB -> Mongo : find_one({"hash_seguridad": ...})
+
         activate Mongo
+
         Mongo --> DB : documento
-        deactivate Mongo
-        DB --> API : documento (o None)
-    deactivate DB
 
-    alt Documento duplicado
-        API --> User : 409 Conflict: "Este PDF ya fue procesado..."
-        deactivate API
+        deactivate Mongo
+
+        DB --> API : documento o None
+
+        deactivate DB
+
+        alt Documento duplicado
+
+            API --> User : "409 Conflict: Este PDF ya fue procesado."
+
+        else Documento nuevo
+
+            API -> Service : extract(bytes)
+
+            activate Service #E8F5E9
+
+            Service -> Service : PdfReader(pages) -> texto
+
+            Service --> API : texto_extraido
+
+            deactivate Service
+
+            API -> DB : guardar_documento(nombre, texto, checksum)
+
+            activate DB #E1F5FE
+
+            DB -> Mongo : insert_one(documento)
+
+            activate Mongo
+
+            Mongo --> DB : resultado insert
+
+            deactivate Mongo
+
+            DB --> API : resultado
+
+            deactivate DB
+
+            API --> User : "200 OK: UploadResponse"
+
+            note right of API
+                {
+                  "status": "success",
+                  "message": "Documento procesado",
+                  "filename": "...",
+                  "sha256": "..."
+                }
+            end note
+
+        end
     end
-
-    API -> Service : extract(bytes)
-    activate Service #E8F5E9
-        Service -> Service : PdfReader(pages) -> texto
-        Service --> API : texto_extraido
-    deactivate Service
-
-    API -> DB : guardar_documento(nombre, texto, checksum)
-    activate DB #E1F5FE
-        DB -> Mongo : insert_one(documento)
-        activate Mongo
-        Mongo --> DB : resultado insert
-        deactivate Mongo
-        DB --> API : resultado
-    deactivate DB
-
-    API --> User : 200 OK: UploadResponse
-    note right
-      {
-        "status": "success",
-        "message": "Documento procesado...",
-        "filename": "...",
-        "sha256": "..."
-      }
-    end note
+end
 
 deactivate API
 
-== === ==
-
-center [bold]Operaciones CRUD Adicionales[/bold]
+== Operaciones CRUD Adicionales ==
 
 User -> API : GET /documentos
+
 activate API #E3F2FD
-    API -> DB : listar_todos()
-    activate DB #E1F5FE
-        DB -> Mongo : find({}, {\"_id\": 0})
-        Mongo --> DB : lista documentos
-        DB --> API : documentos
-    deactivate DB
-    API --> User : 200 OK: {total, documentos}
+
+API -> DB : listar_todos()
+
+activate DB #E1F5FE
+
+DB -> Mongo : find({}, {"_id": 0})
+
+activate Mongo
+
+Mongo --> DB : lista documentos
+
+deactivate Mongo
+
+DB --> API : documentos
+
+deactivate DB
+
+API --> User : "200 OK: {total, documentos}"
+
 deactivate API
 
 User -> API : GET /documentos/{checksum}
+
 activate API #E3F2FD
-    API -> DB : obtener_por_checksum(checksum)
-    activate DB #E1F5FE
-        DB -> Mongo : find_one({...})
-        Mongo --> DB : documento (o None)
-        DB --> API : documento
-    deactivate DB
-    alt Documento no encontrado
-        API --> User : 404 Not Found
-    else Documento encontrado
-        API --> User : 200 OK: documento
-    end
+
+API -> DB : obtener_por_checksum(checksum)
+
+activate DB #E1F5FE
+
+DB -> Mongo : find_one({...})
+
+activate Mongo
+
+Mongo --> DB : documento o None
+
+deactivate Mongo
+
+DB --> API : documento
+
+deactivate DB
+
+alt Documento no encontrado
+
+    API --> User : "404 Not Found"
+
+else Documento encontrado
+
+    API --> User : "200 OK: documento"
+
+end
+
 deactivate API
 
 User -> API : PUT /documentos/{checksum} (nuevo_nombre)
+
 activate API #E3F2FD
-    API -> DB : obtener_por_checksum(checksum)
+
+API -> DB : obtener_por_checksum(checksum)
+
+activate DB #E1F5FE
+
+DB -> Mongo : find_one({...})
+
+activate Mongo
+
+Mongo --> DB : documento
+
+deactivate Mongo
+
+DB --> API : documento
+
+deactivate DB
+
+alt Documento no encontrado
+
+    API --> User : "404 Not Found"
+
+else Documento encontrado
+
+    API -> DB : actualizar_nombre(checksum, nuevo_nombre)
+
     activate DB #E1F5FE
-        DB -> Mongo : find_one({...})
-        Mongo --> DB : documento
-        DB --> API : documento
+
+    DB -> Mongo : update_one({...}, {$set: {...}})
+
+    activate Mongo
+
+    Mongo --> DB : resultado
+
+    deactivate Mongo
+
+    DB --> API : resultado
+
     deactivate DB
-    alt Documento no encontrado
-        API --> User : 404 Not Found
-    else Documento encontrado
-        API -> DB : actualizar_nombre(checksum, nuevo_nombre)
-        activate DB #E1F5FE
-            DB -> Mongo : update_one({...}, {$set: {...}})
-            Mongo --> DB : resultado
-            DB --> API : resultado
-        deactivate DB
-        API --> User : 200 OK: "Nombre actualizado a: ..."
-    end
+
+    API --> User : "200 OK: Nombre actualizado"
+
+end
+
 deactivate API
 
 User -> API : DELETE /documentos/{checksum}
+
 activate API #E3F2FD
-    API -> DB : obtener_por_checksum(checksum)
+
+API -> DB : obtener_por_checksum(checksum)
+
+activate DB #E1F5FE
+
+DB -> Mongo : find_one({...})
+
+activate Mongo
+
+Mongo --> DB : documento
+
+deactivate Mongo
+
+DB --> API : documento
+
+deactivate DB
+
+alt Documento no encontrado
+
+    API --> User : "404 Not Found"
+
+else Documento encontrado
+
+    API -> DB : eliminar_documento(checksum)
+
     activate DB #E1F5FE
-        DB -> Mongo : find_one({...})
-        Mongo --> DB : documento
-        DB --> API : documento
+
+    DB -> Mongo : delete_one({...})
+
+    activate Mongo
+
+    Mongo --> DB : resultado
+
+    deactivate Mongo
+
+    DB --> API : resultado
+
     deactivate DB
-    alt Documento no encontrado
-        API --> User : 404 Not Found
-    else Documento encontrado
-        API -> DB : eliminar_documento(checksum)
-        activate DB #E1F5FE
-            DB -> Mongo : delete_one({...})
-            Mongo --> DB : resultado
-            DB --> API : resultado
-        deactivate DB
-        API --> User : 200 OK: "Documento eliminado..."
-    end
+
+    API --> User : "200 OK: Documento eliminado"
+
+end
+
 deactivate API
 
 @enduml
