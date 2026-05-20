@@ -60,10 +60,17 @@ El proyecto sigue una **arquitectura en capas** simple pero efectiva:
 
 ### Componentes Adicionales
 
+<<<<<<< HEAD
 - **DTOs** (`dtos.py`): Objetos de transferencia de datos con Pydantic
 - **Excepciones** (`exceptions.py`): Errores del dominio (FormatoInvalido, DocumentoDuplicado, etc.)
 
 ---
+=======
+- **DTOs** (`dtos.py`): Objetos de transferencia de datos con Pydantic.
+- **Excepciones** (`exceptions.py`): Errores del dominio (FormatoInvalido, DocumentoDuplicado, etc.).
+
+
+>>>>>>> 47d79fc313a6bb127875f6f310bcb3024285eb45
 
 ## 🚀 Instalación y Configuración
 
