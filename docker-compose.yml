@@ -1,0 +1,69 @@
+# ============================================
+# SERVICIOS PDF EXTRACTOR - Docker Compose
+# ============================================
+
+services:
+  # ----------------------------------------
+  # Servicio de Base de Datos: MongoDB
+  # ----------------------------------------
+  mongodb:
+    image: mongo:7.0
+    container_name: pdf-extractor-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: pdf_extractor_db
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - pdf-extractor-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ----------------------------------------
+  # Servicio de la API: FastAPI
+  # ----------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pdf-extractor-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Variables de entorno para la conexion a MongoDB
+      MONGO_URI: mongodb://admin:admin123@mongodb:27017/pdf_extractor_db?authSource=admin
+      MONGO_DB_NAME: pdf_extractor_db
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - pdf-extractor-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# ============================================
+# VOLUMES (Persistencia de datos)
+# ============================================
+volumes:
+  mongodb_data:
+    driver: local
+
+# ============================================
+# NETWORKS (Comunicacion entre contenedores)
+# ============================================
+networks:
+  pdf-extractor-network:
+    driver: bridge
