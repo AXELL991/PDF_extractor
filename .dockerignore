@@ -1,40 +1,113 @@
+# ============================================================
+# Archivos y directorios excluidos del contexto de Docker build
+# Reducir superficie de ataque y tamaño de imagen
+# ============================================================
+
 # Git
 .git
 .gitignore
+.gitattributes
 
-# Python
+# Python cache y bytecode
 __pycache__
 *.py[cod]
 *$py.class
 *.so
-.venv
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environments virtuales
 venv/
 ENV/
 env/
+.venv
 
-# IDE
+# IDEs y editores
 .vscode
 .idea
 *.swp
 *.swo
 *~
 
-# Tests
-.pytest_cache
+# Tests (si no se necesitan en producción)
 tests/
 test_*
+pytest.ini
+conftest.py
+.coverage
+htmlcov/
+.pytest_cache/
 
-# Docker
-Dockerfile
-docker-compose.yml
+# Archivos de configuración local
+.env
+.env.local
+.env.*.local
+*.local
+
+# Documentación (no necesaria en la imagen)
+docs/
+*.md
+LICENSE
+NOTICE
+
+# Archivos de log
+*.log
+logs/
+
+# Archivos temporales
+tmp/
+temp/
+*.tmp
+
+# Archivos de configuración de CI/CD
+.github
+.gitlab-ci*
+.travis.yml
+azure-pipelines.yml
+
+# Archivos de Docker (evita bucle de build)
+Dockerfile*
+docker-compose*
 .dockerignore
 
-# Documentacion
-README.md
-diagramas_secuencia.puml
+# Archivos de seguridad y secretos (CRÍTICO)
+secrets/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.jks
 
-# Otros
-.env
-.env.example
-.uv
+# Archivos de base de datos locales
+*.sqlite
+*.sqlite3
+*.db
 
+# Archivos de cache
+.cache
+.mypy_cache
+.dmypy.json
+.pyre
+.pytype
+
+# Archivos de análisis estático
+.bandit
+.safety
+
+# Node modules (si aplica)
+node_modules/

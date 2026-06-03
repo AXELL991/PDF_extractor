@@ -14,6 +14,27 @@ dependencies = [
     "motor>=3.7.1",
     "pydantic-settings>=2.13.1",
     "python-multipart>=0.0.27",
+    "slowapi>=0.1.9",        # Rate limiting para protección contra DoS
+    "python-jose[cryptography]>=3.3.0",  # JWT para autenticación segura
+    "cryptography>=42.0.0",  # Criptografía de alto nivel
+    "bcrypt>=4.1.0",         # Hashing de contraseñas
+    "httpx>=0.27.0",         # Cliente HTTP async seguro
+    "pyotp>=2.9.0",          # 2FA / OTP para autenticación de dos factores
+    "bleach>=6.1.0",         # Sanitización de HTML/inputs
+    "python-magic>=0.4.27",  # Detección de tipo MIME por magic numbers
+    "h11>=0.14.0",           # Parser HTTP seguro
+    "watchdog>=3.0.0",       # Monitoreo de archivos en tiempo real
+    "secure>=0.3.0",         # Headers HTTP de seguridad automáticos
+    "structlog>=24.4.0",     # Logging estructurado más seguro
+    "prometheus-fastapi-instrumentator>=7.0.0",  # Métricas de seguridad y monitoreo
+    "python-json-logger>=2.0.7", # Logger JSON estructurado
+    "environs>=11.0.0",      # Manejo de variables de entorno robusto
+    "bandit[toml]>=1.7.0",   # Análisis estático de seguridad
+    "werkzeug>=3.0.0",       # Utilidades de seguridad HTTP
+    "argon2-cffi>=23.0.0",   # Hashing de contraseñas Argon2 (más seguro que bcrypt)
+    "ipaddress>=1.0.0",      # Validación de IPs y rangos
+    "starlette-context>=0.3.0",  # Contexto de request para logging trazable
+    "python-certifi-win32>=1.6.0"  # Certificados CA actualizados en Windows
 ]
 
 [tool.pytest.ini_options]
