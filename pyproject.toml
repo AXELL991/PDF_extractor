@@ -34,7 +34,8 @@ dependencies = [
     "argon2-cffi>=23.0.0",   # Hashing de contraseñas Argon2 (más seguro que bcrypt)
     "ipaddress>=1.0.0",      # Validación de IPs y rangos
     "starlette-context>=0.3.0",  # Contexto de request para logging trazable
-    "python-certifi-win32>=1.6.0"  # Certificados CA actualizados en Windows
+    "python-certifi-win32>=1.6.0",  # Certificados CA actualizados en Windows
+    "itsdangerous>=2.1.0",     # Firmado de datos/cookies de sesión (SessionMiddleware)
 ]
 
 [tool.pytest.ini_options]
