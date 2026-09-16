@@ -328,7 +328,7 @@ async def security_txt():
     response_model=UploadResponse,
 )
 @limiter.limit("5/minute")
-async def upload_pdf(file: UploadFile = File(...)) -> UploadResponse:
+async def upload_pdf(request: Request, file: UploadFile = File(...)) -> UploadResponse:
     """
     Recibe un PDF, valida seguridad (formato, tamaño, magic numbers),
     verifica duplicado, extrae texto y lo guarda en MongoDB.
@@ -463,7 +463,7 @@ async def obtener_documento(checksum: str, request: Request):
 )
 @limiter.limit("60/minute")
 async def actualizar_documento(
-    checksum: str, request: ActualizarRequest, fastapi_request: Request
+    checksum: str, request: Request, datos: ActualizarRequest
 ):
     """Permite corregir el nombre de un archivo que ya fue guardado."""
     try:
@@ -478,7 +478,7 @@ async def actualizar_documento(
 
     # Sanitizar el nuevo nombre
     try:
-        nuevo_nombre = sanitize_filename(request.nuevo_nombre)
+        nuevo_nombre = sanitize_filename(datos.nuevo_nombre)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

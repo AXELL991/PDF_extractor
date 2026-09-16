@@ -5,7 +5,12 @@ from unittest.mock import Mock, patch
 
 from app.main import app
 
-client = TestClient(app)
+# base_url con host "localhost" para pasar la validación de TrustedHostMiddleware
+client = TestClient(app, base_url="http://localhost")
+
+# Checksums con formato SHA-256 válido (64 chars hex) requerido por validate_checksum
+CHECKSUM_EXISTENTE = "a" * 64
+CHECKSUM_INEXISTENTE = "f" * 64
 
 
 class TestCreate:
@@ -35,7 +40,7 @@ class TestCreate:
         response = client.post("/upload", files=files)
 
         assert response.status_code == 400
-        assert "no es PDF" in response.json()["detail"]
+        assert "no es un PDF" in response.json()["detail"]
 
     @patch("app.main.db")
     def test_upload_duplicate_pdf(self, mock_db):
@@ -67,8 +72,8 @@ class TestRead:
     def test_list_documents_with_data(self, mock_db):
         """Lista documentos existentes."""
         mock_db.listar_todos.return_value = [
-            {"archivo": "doc1.pdf", "hash_seguridad": "abc123"},
-            {"archivo": "doc2.pdf", "hash_seguridad": "def456"}
+            {"archivo": "doc1.pdf", "hash_seguridad": CHECKSUM_EXISTENTE},
+            {"archivo": "doc2.pdf", "hash_seguridad": "b" * 64}
         ]
 
         response = client.get("/documentos")
@@ -82,11 +87,11 @@ class TestRead:
         mock_db.obtener_por_checksum.return_value = {
             "archivo": "test.pdf",
             "texto": "contenido",
-            "hash_seguridad": "abc123",
+            "hash_seguridad": CHECKSUM_EXISTENTE,
             "_id": "mongo_id"
         }
 
-        response = client.get("/documentos/abc123")
+        response = client.get(f"/documentos/{CHECKSUM_EXISTENTE}")
 
         assert response.status_code == 200
         assert response.json()["archivo"] == "test.pdf"
@@ -97,7 +102,7 @@ class TestRead:
         """Buscar documento inexistente devuelve 404."""
         mock_db.obtener_por_checksum.return_value = None
 
-        response = client.get("/documentos/noexiste")
+        response = client.get(f"/documentos/{CHECKSUM_INEXISTENTE}")
 
         assert response.status_code == 404
 
@@ -112,7 +117,7 @@ class TestUpdate:
         mock_db.actualizar_nombre.return_value = Mock(modified_count=1)
 
         response = client.put(
-            "/documentos/abc123",
+            f"/documentos/{CHECKSUM_EXISTENTE}",
             json={"nuevo_nombre": "nuevo.pdf"}
         )
 
@@ -125,7 +130,7 @@ class TestUpdate:
         mock_db.obtener_por_checksum.return_value = None
 
         response = client.put(
-            "/documentos/noexiste",
+            f"/documentos/{CHECKSUM_INEXISTENTE}",
             json={"nuevo_nombre": "nuevo.pdf"}
         )
 
@@ -141,7 +146,7 @@ class TestDelete:
         mock_db.obtener_por_checksum.return_value = {"archivo": "borrar.pdf"}
         mock_db.eliminar_documento.return_value = Mock(deleted_count=1)
 
-        response = client.delete("/documentos/abc123")
+        response = client.delete(f"/documentos/{CHECKSUM_EXISTENTE}")
 
         assert response.status_code == 200
         assert "eliminado" in response.json()["message"].lower()
@@ -151,6 +156,6 @@ class TestDelete:
         """Eliminar documento inexistente devuelve 404."""
         mock_db.obtener_por_checksum.return_value = None
 
-        response = client.delete("/documentos/noexiste")
+        response = client.delete(f"/documentos/{CHECKSUM_INEXISTENTE}")
 
         assert response.status_code == 404

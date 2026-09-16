@@ -21,7 +21,8 @@ dependencies = [
     "httpx>=0.27.0",         # Cliente HTTP async seguro
     "pyotp>=2.9.0",          # 2FA / OTP para autenticación de dos factores
     "bleach>=6.1.0",         # Sanitización de HTML/inputs
-    "python-magic>=0.4.27",  # Detección de tipo MIME por magic numbers
+    "python-magic>=0.4.27; sys_platform != 'win32'",  # Detección de tipo MIME por magic numbers
+    "python-magic-bin>=0.4.14; sys_platform == 'win32'",  # Incluye libmagic DLL en Windows
     "h11>=0.14.0",           # Parser HTTP seguro
     "watchdog>=3.0.0",       # Monitoreo de archivos en tiempo real
     "secure>=0.3.0",         # Headers HTTP de seguridad automáticos
