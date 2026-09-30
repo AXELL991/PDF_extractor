@@ -84,6 +84,16 @@ ALLOWED_ORIGINS = os.getenv(
 ).split(",")
 
 # ============================================================
+#  CONFIGURACIÓN DE HOSTS CONFIABLES (Trusted Host)
+# ============================================================
+# Hosts válidos para el header Host (evita Host header injection).
+# Incluye localhost/127.0.0.1 para desarrollo local y dominios UTN para producción.
+ALLOWED_HOSTS = os.getenv(
+    "ALLOWED_HOSTS",
+    "localhost,127.0.0.1,*.utn.edu.ar,pdf-extractor.utn.edu.ar",
+).split(",")
+
+# ============================================================
 #  CONSTANTES DE SEGURIDAD
 # ============================================================
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "5"))
@@ -146,12 +156,7 @@ app.add_middleware(
 # 2. Trusted Host validation (evita Host header injection)
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=[
-        "localhost",
-        ".utn.edu.ar",
-        "pdf-extractor.utn.edu.ar",
-        f"*.{os.getenv('HOST_SUFFIX', 'utn.edu.ar')}",
-    ],
+    allowed_hosts=[h.strip() for h in ALLOWED_HOSTS if h.strip()],
 )
 
 # 3. GZip compression con nivel seguro
