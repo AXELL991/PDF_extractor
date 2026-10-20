@@ -15,7 +15,7 @@ API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**.
 * Cerda Santiago 10802
 * Serpa Juan Cruz 10938
 
----
+---+
 
 ## 🛠️ Funcionalidades Implementadas (Rúbrica Etapa 1)
 
@@ -161,9 +161,12 @@ PDF_EXTRACTOR/
 │   ├── database.py             # Repositorio MongoDB (CRUD completo)
 │   ├── dtos.py                 # DTOs Pydantic para respuestas API
 │   ├── exceptions.py           # Excepciones personalizadas del dominio
-│   └── services/
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── pdf_extractor.py    # Lógica de extracción de PDF
+│   └── use_cases/
 │       ├── __init__.py
-│       └── pdf_extractor.py    # Lógica de extracción de PDF
+│       └── procesar_documento.py  # Caso de uso: validar, extraer y persistir un PDF
 ├── tests/
 │   ├── __init__.py
 │   ├── test_extractor_completo.py   # Tests unitarios del extractor
@@ -197,7 +200,7 @@ PDF_EXTRACTOR/
 
 ## 🧹 Principios de Clean Code Aplicados
 
-- **Nombres Intencionales**: `validar_formato()`, `verificar_duplicado()`
+- **Nombres Intencionales**: `ProcesarDocumentoUseCase.execute()`, `validar_formato()`, `verificar_duplicado()`
 - **Funciones Pequeñas**: Cada función hace una sola cosa
 - **Sin Comentarios Innecesarios**: El código es su propia documentación
 - **Manejo de Errores**: Excepciones en lugar de códigos de retorno

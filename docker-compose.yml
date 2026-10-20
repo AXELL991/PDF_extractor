@@ -7,7 +7,7 @@ services:
   # Servicio de Base de Datos: MongoDB
   # ----------------------------------------
   mongodb:
-    image: mongo:7.0
+    image: mongo:7.0 
     container_name: pdf-extractor-mongodb
     restart: unless-stopped
     ports:
@@ -17,7 +17,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: admin123
       MONGO_INITDB_DATABASE: pdf_extractor_db
     volumes:
-      - mongodb_data:/data/db
+      - mongodb_data:/data/db 
     networks:
       - pdf-extractor-network
     healthcheck:
