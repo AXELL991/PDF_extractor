@@ -1,0 +1,131 @@
+# ============================================================
+# Docker Compose con configuraciones de seguridad avanzadas
+# para el Extractor de PDF - UTN San Rafael
+#
+# Uso: docker-compose -f docker-compose.security.yml up -d
+# ============================================================
+
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: pdf-extractor-utn:latest
+    container_name: pdf-extractor-secure
+    
+    # Variables de entorno de seguridad
+    environment:
+      - ENVIRONMENT=production
+      - LOGLEVEL=INFO
+      - MAX_FILE_SIZE_MB=5
+      - ALLOWED_ORIGINS=https://pdf-extractor.utn.edu.ar
+      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
+      - ENFORCE_IP_VALIDATION=false
+      - FASTAPI_DEBUG=false
+      # MongoDB connection (use secrets in production)
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DB_NAME=${MONGO_DB_NAME}
+    
+    # Puertos expuestos
+    ports:
+      - "8000:8000"
+    
+    # Redes
+    networks:
+      - pdf-extractor-network
+    
+    # Límites de recursos para prevenir DoS por Resource Exhaustion
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    # Restart policy con backoff para evitar loops infinitos
+    restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", 
+        "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    
+    # ============================================================
+    #  OPCIONES DE SEGURIDAD CRÍTICAS DE DOCKER
+    # ============================================================
+    security_opt:
+      # No permitir nuevos privilegios (evita setuid/setgid exploits)
+      - no-new-privileges:true
+      # Perfil seccomp personalizado (si existe)
+      - seccomp:unconfined
+      # AppArmor profile estricto
+      - apparmor:docker-default
+      # Label de SELinux para aislamiento de contenedores
+      - label:type:container_t
+    
+    # Read-only filesystem (evita modificaciones al sistema de archivos)
+    read_only: true
+    
+    # Capabilities: eliminar todas y agregar solo las necesarias (principio de mínimo privilegio)
+    cap_drop:
+      - ALL  # Eliminar todas las capabilities
+    # Como usamos puerto 8000 (>1024), no necesitamos ninguna capability adicional
+    cap_add: []
+    
+    # tmpfs para directorios que necesitan escritura (logs, tmp)
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+      - /app/logs:noexec,nosuid,size=50m
+    
+    # User/Group ID explícitos
+    user: "1000:1000"
+    
+    # Ulimits para prevenir resource exhaustion attacks
+    ulimits:
+      nproc:
+        soft: 100
+        hard: 200
+      nofile:
+        soft: 1024
+        hard: 2048
+      fsize:
+        soft: 10485760  # 10MB máximo por archivo
+        hard: 10485760
+    
+    # Logging con límite de tamaño para evitar filling del disco
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "production,security"
+    
+    # No acceso a /dev de host
+    devices: []
+    
+    # Aislamiento de PID (aislado del host por defecto)
+    
+    # Isolación de IPC para prevenir shared memory attacks
+    ipc: "private"
+    
+    # Seccomp profile personalizado (opcional para hardening extremo)
+    # Puedes crear: docker run --rm alpine cat /etc/seccomp/default.json > seccomp.json
+    # y modificarlo para restringir syscalls permitidos.
+
+networks:
+  pdf-extractor-network:
+    driver: bridge
+    internal: false  # Cambiar a true si no necesita acceso externo
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
