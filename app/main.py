@@ -1,12 +1,22 @@
-from fastapi import FastAPI, UploadFile, File, Request
-from fastapi.responses import JSONResponse
+"""
+extractor-pdf-utn - API REST segura para extracción de texto desde PDFs.
+
+Implementa una API FastAPI con capas de seguridad (rate limiting, CORS
+estricto, headers de seguridad, logging estructurado) y delega la lógica
+de negocio del upload al caso de uso `ProcesarDocumentoUseCase`.
+
+Versión: 2.0.0
+"""
+
+import logging
+import os
+import time
 
 from fastapi import (
     FastAPI,
     File,
     HTTPException,
     Request,
-    Response,
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,19 +32,23 @@ from app.core.logging_config import setup_logging
 from app.core.security import (
     generate_csrf_token,
     is_safe_ip,
+    is_valid_pdf,
     sanitize_filename,
-    sanitize_text,
     validate_checksum,
-    validate_file_content,
 )
 from app.database import MongoRepository
 from app.dtos import ActualizarRequest, MensajeResponse, UploadResponse
-from app.exceptions import DomainException
-<<<<<<< HEAD
-from app.use_cases.procesar_documento import ProcesarDocumentoUseCase
-=======
+from app.exceptions import (
+    DocumentoNoEncontradoError,
+    DomainException,
+    TamañoExcedidoError,
+)
 from app.services.pdf_extractor import PyPDFExtractor
->>>>>>> main
+from app.use_cases.procesar_documento import (
+    MAX_FILE_SIZE_BYTES,
+    MAX_FILE_SIZE_MB,
+    ProcesarDocumentoUseCase,
+)
 
 # ============================================================
 #  INICIALIZACIÓN DEL LOGGING SEGURO
@@ -78,8 +92,6 @@ ALLOWED_HOSTS = os.getenv(
 # ============================================================
 #  CONSTANTES DE SEGURIDAD
 # ============================================================
-MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "5"))
-MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 SECURITY_HEADERS = {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "X-Content-Type-Options": "nosniff",
@@ -100,7 +112,7 @@ app = FastAPI(
     title="Extractor de PDF - UTN San Rafael",
     description="""
     API segura para extracción de texto de PDFs con persistencia en MongoDB.
-    
+
     Características de seguridad:
     - Rate limiting por IP
     - Validación de archivos por magic numbers
@@ -109,13 +121,9 @@ app = FastAPI(
     - Logging estructurado y rotativo
     - CORS estricto
     """,
-<<<<<<< HEAD
-    version="1.4.0"
-=======
     version="2.0.0",
     docs_url="/docs" if ENVIRONMENT == "development" else None,
     redoc_url="/redoc" if ENVIRONMENT == "development" else None,
->>>>>>> main
 )
 
 # ============================================================
@@ -173,7 +181,7 @@ async def security_middleware(request: Request, call_next):
     """
     start_time = time.time()
     client_ip = request.client.host if request.client else "unknown"
-    
+
     # Logging del request entrante
     logger.info(
         f"Request {request.method} {request.url.path} from {client_ip}",
@@ -220,10 +228,7 @@ async def security_middleware(request: Request, call_next):
 # ============================================================
 extractor = PyPDFExtractor()
 db = MongoRepository()
-<<<<<<< HEAD
 procesar_doc_use_case = ProcesarDocumentoUseCase(extractor=extractor, db=db)
-=======
->>>>>>> main
 
 
 # ============================================================
@@ -282,7 +287,7 @@ async def health_check(request: Request):
         "version": "2.0.0",
         "environment": ENVIRONMENT,
     }
-    
+
     # Verificar conexión a MongoDB
     try:
         db.client.admin.command("ping")
@@ -291,7 +296,7 @@ async def health_check(request: Request):
         logger.error(f"Error de conexión a MongoDB: {e}")
         health_status["database"] = "disconnected"
         return JSONResponse(status_code=503, content=health_status)
-    
+
     return health_status
 
 
@@ -325,100 +330,40 @@ async def security_txt():
 @limiter.limit("5/minute")
 async def upload_pdf(request: Request, file: UploadFile = File(...)) -> UploadResponse:
     """
-    Recibe un PDF, valida seguridad (formato, tamaño, magic numbers),
+    Recibe un PDF, valida seguridad (nombre, tamaño, magic numbers),
     verifica duplicado, extrae texto y lo guarda en MongoDB.
     """
-<<<<<<< HEAD
-    contents = await file.read()
-    # Se re-liga el repositorio del módulo para mantenerlo intercambiable (tests).
-    procesar_doc_use_case.db = db
-    return procesar_doc_use_case.execute(
-        filename=file.filename,
-        content_bytes=contents,
-        file_size=file.size,
-    )
-
-
-=======
     logger.info(f"Iniciando upload de archivo: {file.filename}")
 
-    # --- Validación de tamaño antes de leer contenido ---
+    # --- Validación de tamaño antes de leer el contenido ---
     if file.size and file.size > MAX_FILE_SIZE_BYTES:
         logger.warning(f"Archivo excede tamaño máximo: {file.size} bytes")
-        from app.exceptions import TamañoExcedidoError
         raise TamañoExcedidoError(MAX_FILE_SIZE_MB)
 
-    # --- Validación del nombre de archivo ---
+    # --- Validación y sanitización del nombre de archivo ---
     try:
         sanitized_name = sanitize_filename(file.filename or "")
     except ValueError as e:
         logger.warning(f"Nombre de archivo inválido: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
-    # --- Leer contenido completo para validación profunda ---
-    try:
-        contents = await file.read()
-    except Exception as e:
-        logger.error(f"Error leyendo archivo: {e}")
-        raise HTTPException(status_code=400, detail="Error leyendo el archivo.")
+    contents = await file.read()
 
-    if len(contents) > MAX_FILE_SIZE_BYTES:
-        logger.warning(f"Archivo excede tamaño máximo tras lectura: {len(contents)} bytes")
-        from app.exceptions import TamañoExcedidoError
-        raise TamañoExcedidoError(MAX_FILE_SIZE_MB)
-
-    # --- Validación por magic numbers y MIME type ---
-    if not validate_file_content(contents):
-        logger.warning("Archivo no pasó validación de contenido (magic numbers/MIME)")
+    # --- Validación por magic numbers (contenido realmente PDF) ---
+    if not is_valid_pdf(contents):
+        logger.warning("El contenido no tiene la firma magic de un PDF")
         raise HTTPException(status_code=400, detail="El archivo no es un PDF válido.")
 
-    # --- Procesamiento seguro en RAM ---
-    archivo_en_ram = io.BytesIO(contents)
-    try:
-        checksum = extractor.calculate_checksum(archivo_en_ram)
-        validate_checksum(checksum)  # Validar que sea un SHA-256 legítimo
-        
-        verificar_duplicado(checksum)
-
-        texto_extraido = extractor.extract(archivo_en_ram)
-        texto_sanitizado = sanitize_text(texto_extraido) if texto_extraido else "Vacio"
-
-        db.guardar_documento(sanitized_name, texto_sanitizado, checksum)
-
-        logger.info(f"PDF procesado y guardado: {sanitized_name} (sha256={checksum[:16]}...)")
-
-        return UploadResponse(
-            status="success",
-            message="Documento procesado y guardado correctamente.",
-            filename=sanitized_name,
-            sha256=checksum,
-        )
-    finally:
-        archivo_en_ram.close()
+    # --- Lógica de negocio: checksum, duplicados, extracción y persistencia ---
+    # Se re-liga el repositorio del módulo para mantenerlo intercambiable (tests).
+    procesar_doc_use_case.db = db
+    return procesar_doc_use_case.execute(
+        filename=sanitized_name,
+        content_bytes=contents,
+        file_size=file.size,
+    )
 
 
-def validar_formato(filename: str):
-    """Verifica que el archivo sea PDF (validación simple, extra)."""
-    if not filename.lower().endswith(".pdf"):
-        from app.exceptions import FormatoInvalidoError
-        raise FormatoInvalidoError()
-
-
-async def validar_tamaño(file: UploadFile):
-    """Verifica que el archivo no exceda el tamaño máximo."""
-    if file.size and file.size > MAX_FILE_SIZE_BYTES:
-        from app.exceptions import TamañoExcedidoError
-        raise TamañoExcedidoError(MAX_FILE_SIZE_MB)
-
-
-def verificar_duplicado(checksum: str):
-    """Verifica que el documento no exista ya en la base de datos."""
-    if db.obtener_por_checksum(checksum):
-        from app.exceptions import DocumentoDuplicadoError
-        raise DocumentoDuplicadoError()
-
-
->>>>>>> main
 # =====================================================================
 # R - READ (Leer documentos persistidos)
 # =====================================================================
@@ -453,7 +398,6 @@ async def obtener_documento(checksum: str, request: Request):
 
     doc = db.obtener_por_checksum(checksum)
     if not doc:
-        from app.exceptions import DocumentoNoEncontradoError
         raise DocumentoNoEncontradoError()
 
     doc.pop("_id", None)
@@ -481,7 +425,6 @@ async def actualizar_documento(
         raise HTTPException(status_code=400, detail=str(e))
 
     if not db.obtener_por_checksum(checksum):
-        from app.exceptions import DocumentoNoEncontradoError
         raise DocumentoNoEncontradoError()
 
     # Sanitizar el nuevo nombre
@@ -517,7 +460,6 @@ async def borrar_documento(checksum: str, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
     if not db.obtener_por_checksum(checksum):
-        from app.exceptions import DocumentoNoEncontradoError
         raise DocumentoNoEncontradoError()
 
     db.eliminar_documento(checksum)

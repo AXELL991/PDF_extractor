@@ -1,5 +1,4 @@
 """Tests para operaciones CRUD completas."""
-import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch
 
