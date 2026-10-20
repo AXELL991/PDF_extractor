@@ -1,5 +1,4 @@
 """Tests para excepciones personalizadas."""
-import pytest
 from app.exceptions import (
     DomainException,
     FormatoInvalidoError,

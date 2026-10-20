@@ -1,7 +1,6 @@
 """Tests completos para el extractor de PDF."""
 import io
 import hashlib
-import pytest
 from app.services.pdf_extractor import PyPDFExtractor
 
 
