@@ -25,6 +25,16 @@ SECURITY_HEADERS = {
     "Expires": "0",
 }
 
+# Swagger UI y ReDoc cargan scripts y estilos desde CDNs (jsdelivr) e inline.
+DOCS_PATHS = {"/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"}
+DOCS_CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://fastapi.tiangolo.com https://cdn.jsdelivr.net; "
+    "font-src 'self' https://cdn.jsdelivr.net;"
+)
+
 
 async def security_middleware(request: Request, call_next):
     """Aplica cabeceras de seguridad, valida la IP de origen y loguea la request."""
@@ -53,6 +63,10 @@ async def security_middleware(request: Request, call_next):
 
     for header, value in SECURITY_HEADERS.items():
         response.headers[header] = value
+
+    # Si es ruta de documentación interactiva, relajar CSP para permitir cargar Swagger UI de cdn.jsdelivr.net
+    if request.url.path in DOCS_PATHS:
+        response.headers["Content-Security-Policy"] = DOCS_CONTENT_SECURITY_POLICY
 
     process_time = time.time() - start_time
     response.headers["X-Request-ID"] = generate_csrf_token()[:16]
