@@ -1,11 +1,11 @@
 [project]
 name = "pdf-extractext"
 version = "0.1.0"
-description = "Herramienta en Python para extraer texto de PDFs y generar resúmenes con Inteligencia Artificial."
+description = "Herramienta en Python para extraer contenido de PDFs en formato Markdown y persistir en MongoDB."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "pypdf>=4.0.0",              # Para la extracción de texto del PDF
+    "pypdf>=4.0.0",              # Para la extracción de contenido del PDF a Markdown
     "pymongo>=4.6.0",            # Para la conexión con la base de datos NoSQL
     "python-dotenv>=1.0.0",      # Para gestionar configuraciones vía entorno (12 Factor)
     "fastapi>=0.136.0",

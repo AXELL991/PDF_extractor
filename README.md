@@ -4,27 +4,30 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Traefik](https://img.shields.io/badge/Traefik-24A1C1?style=for-the-badge&logo=traefik&logoColor=white)](https://traefik.io/)
 
-API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**. Se encarga de la extracción de texto de documentos PDF, validación de integridad y persistencia en base de datos NoSQL.
+API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**. Se encarga de la extracción de contenido estructurado en **Markdown** a partir de documentos PDF, validación de integridad (SHA-256) y persistencia en base de datos NoSQL (MongoDB), todo expuesto a través de **Traefik API Gateway**.
 
 ---
 
 ## Integrantes - Legajo
 
-* Puita axel 10903
+* Puita Axel 10903
 * Cerda Santiago 10802
 * Serpa Juan Cruz 10938
 
----+
+---
 
 ## 🛠️ Funcionalidades Implementadas (Rúbrica Etapa 1)
 
 * [x] **Procesamiento en RAM:** Uso de `io.BytesIO` para evitar almacenamiento temporal en disco.
-* [x] **Validación de Archivos:** Control estricto de extensión (.pdf) y tamaño máximo (5MB).
+* [x] **Extracción a Markdown:** Conversión y preservación de estructura de páginas, encabezados y listas en Markdown limpio.
+* [x] **Validación de Archivos:** Control estricto de extensión (.pdf), magic numbers binarios y tamaño máximo (5MB).
 * [x] **Integridad de Datos:** Generación de Checksum SHA-256 para prevenir documentos duplicados.
 * [x] **Base de Datos NoSQL:** Persistencia completa en MongoDB.
 * [x] **CRUD Operacional:** Endpoints para Crear, Leer, Actualizar y Eliminar registros.
-* [x] **Arquitectura en Capas:** Separación clara entre presentación, negocio y datos.
+* [x] **API Gateway (Traefik):** Entrada unificada en puerto 80 con proxy inverso y dashboard.
+* [x] **Arquitectura Limpia & Casos de Uso:** Separación clara entre capas, endpoints, casos de uso y repositorios.
 * [x] **Manejo de Excepciones:** Excepciones personalizadas del dominio con códigos HTTP apropiados.
 * [x] **DTOs Tipados:** Respuestas de API con Pydantic para validación automática.
 
@@ -32,36 +35,28 @@ API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**.
 
 ## 🏗️ Arquitectura del Proyecto
 
-El proyecto sigue una **arquitectura en capas** simple pero efectiva:
-
 ```
-┌─────────────────────────────────────────┐
-│           CAPA DE PRESENTACIÓN          │
-│              (main.py)                  │
-│     - Endpoints FastAPI                 │
-│     - Validaciones de entrada           │
-│     - Manejo de excepciones             │
-└──────────────────┬──────────────────────┘
-                   │
-┌──────────────────▼──────────────────────┐
-│           CAPA DE NEGOCIO               │
-│      (services/pdf_extractor.py)        │
-│     - Extracción de texto PDF           │
-│     - Generación de checksum SHA-256    │
-└──────────────────┬──────────────────────┘
-                   │
-┌──────────────────▼──────────────────────┐
-│           CAPA DE DATOS                 │
-│         (database.py)                   │
-│     - Conexión MongoDB                  │
-│     - Operaciones CRUD                  │
-└─────────────────────────────────────────┘
+                         [ Cliente / Frontend ]
+                                    │
+                                    │ HTTP :80
+                                    ▼
+                      ┌───────────────────────────┐
+                      │    Traefik API Gateway    │
+                      │   Dashboard en :8080      │
+                      └─────────────┬─────────────┘
+                                    │
+                      ┌─────────────▼─────────────┐
+                      │   FastAPI Application     │
+                      │  - Rutas y Middlewares    │
+                      │  - ProcesarDocumentoUseCase│
+                      └───────┬─────────────┬─────┘
+                              │             │
+        ┌─────────────────────▼──┐       ┌──▼───────────────────┐
+        │  PyPDFExtractor        │       │  MongoRepository     │
+        │  (Extracción Markdown  │       │  (Persistencia en    │
+        │   y Hash SHA-256)      │       │   MongoDB)           │
+        └────────────────────────┘       └──────────────────────┘
 ```
-
-### Componentes Adicionales
-
-- **DTOs** (`dtos.py`): Objetos de transferencia de datos con Pydantic.
-- **Excepciones** (`exceptions.py`): Errores del dominio (FormatoInvalido, DocumentoDuplicado, etc.).
 
 ---
 
@@ -70,10 +65,10 @@ El proyecto sigue una **arquitectura en capas** simple pero efectiva:
 ### 1. Requisitos Previos
 
 * Python 3.11+
-* Docker Desktop (para el motor de base de datos)
-* [uv](https://docs.astral.sh/uv/) (Recomendado para gestión de entorno)
+* Docker Desktop
+* [uv](https://docs.astral.sh/uv/) (Recomendado para gestión de dependencias)
 
-### 2. Configuración del Entorno (en terminal de visual studio)
+### 2. Configuración del Entorno
 
 ```bash
 # Crear archivo de configuración
@@ -83,118 +78,22 @@ cp .env.example .env
 uv sync
 ```
 
-### 3. Levantar Infraestructura (Docker)
+### 3. Levantar Todo con Docker Compose (Traefik + Mongo + API)
 
 ```bash
-# Descargar e iniciar el contenedor de MongoDB
-docker run -d --name mongo-utn -p 27017:27017 mongo:latest
+docker compose up --build -d
 ```
+
+- **API a través del Gateway:** `http://localhost/` o `http://localhost/docs` (Puerto 80)
+- **Dashboard de Traefik:** `http://localhost:8080`
+- **MongoDB:** `localhost:27017`
 
 ---
 
-## 🖥️ Ejecución de la API
+## 🧪 Pruebas Unitarias y de Integración
 
-Para iniciar el servidor de desarrollo:
-
-```bash
-uv run uvicorn app.main:app --reload
-```
-
-Acceso a la documentación interactiva (Swagger UI):
-👉 http://127.0.0.1:8000/docs
-
----
-
-## 🧪 Pruebas Automáticas (TDD)
-
-El proyecto cuenta con **23 tests** organizados por funcionalidad:
-
-| Suite | Tests | Descripción |
-|-------|-------|-------------|
-| `test_extractor_completo.py` | 5 | Tests de la capa de negocio (extracción y checksum) |
-| `test_crud.py` | 12 | Tests de integración para todas las operaciones CRUD |
-| `test_exceptions.py` | 6 | Tests de excepciones personalizadas |
-
-### Ejecutar Tests
+Para correr la suite de tests automatizada:
 
 ```bash
-# Ejecutar todos los tests
 uv run pytest
-
-# Ejecutar con verbose
-uv run pytest -v
-
-# Ejecutar solo tests de CRUD
-uv run pytest tests/test_crud.py -v
-
-# Ejecutar con cobertura
-uv run pytest --cov=app
 ```
-
-### Tests Implementados
-
-- ✅ Extracción de texto de PDFs
-- ✅ Generación consistente de checksums SHA-256
-- ✅ Validación de formatos (solo PDF)
-- ✅ Prevención de documentos duplicados
-- ✅ Listado de documentos (vacío y con datos)
-- ✅ Búsqueda por checksum (éxito y error 404)
-- ✅ Actualización de nombres (éxito y error 404)
-- ✅ Eliminación de documentos (éxito y error 404)
-
----
-
-## 📂 Estructura del Proyecto
-
-```text
-PDF_EXTRACTOR/
-├── app/
-│   ├── __init__.py
-│   ├── main.py                 # Endpoints FastAPI + manejo de excepciones
-│   ├── database.py             # Repositorio MongoDB (CRUD completo)
-│   ├── dtos.py                 # DTOs Pydantic para respuestas API
-│   ├── exceptions.py           # Excepciones personalizadas del dominio
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── pdf_extractor.py    # Lógica de extracción de PDF
-│   └── use_cases/
-│       ├── __init__.py
-│       └── procesar_documento.py  # Caso de uso: validar, extraer y persistir un PDF
-├── tests/
-│   ├── __init__.py
-│   ├── test_extractor_completo.py   # Tests unitarios del extractor
-│   ├── test_crud.py                 # Tests de integración CRUD
-│   └── test_exceptions.py           # Tests de excepciones
-├── .env.example                # Plantilla de configuración
-├── .gitignore
-├── pyproject.toml              # Dependencias y metadatos del proyecto
-└── README.md
-```
-
----
-
-## 🔌 Endpoints de la API
-
-### Estado
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/` | Verifica que la API esté online |
-
-### Documentos (CRUD)
-| Método | Endpoint | Descripción | Códigos de Respuesta |
-|--------|----------|-------------|---------------------|
-| POST | `/upload` | Subir y procesar PDF | 200, 400, 409, 413 |
-| GET | `/documentos` | Listar todos los PDFs | 200 |
-| GET | `/documentos/{checksum}` | Buscar por hash SHA-256 | 200, 404 |
-| PUT | `/documentos/{checksum}` | Actualizar nombre | 200, 404 |
-| DELETE | `/documentos/{checksum}` | Eliminar documento | 200, 404 |
-
----
-
-## 🧹 Principios de Clean Code Aplicados
-
-- **Nombres Intencionales**: `ProcesarDocumentoUseCase.execute()`, `validar_formato()`, `verificar_duplicado()`
-- **Funciones Pequeñas**: Cada función hace una sola cosa
-- **Sin Comentarios Innecesarios**: El código es su propia documentación
-- **Manejo de Errores**: Excepciones en lugar de códigos de retorno
-- **Separación de Responsabilidades**: Cada capa tiene su función clara

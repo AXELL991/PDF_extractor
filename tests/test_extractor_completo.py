@@ -1,17 +1,29 @@
-"""Tests completos para el extractor de PDF."""
+"""Tests completos para el extractor de PDF a Markdown."""
 import io
 import hashlib
 from app.services.pdf_extractor import PyPDFExtractor
 
 
 def test_extract_text_from_pdf():
-    """Verifica que el extractor devuelva un string."""
+    """Verifica que el extractor devuelva un string en formato Markdown."""
     extractor = PyPDFExtractor()
     fake_pdf = io.BytesIO(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF")
 
     resultado = extractor.extract(fake_pdf)
 
     assert isinstance(resultado, str)
+
+
+def test_format_page_to_markdown():
+    """Verifica la conversion estructurada a Markdown."""
+    extractor = PyPDFExtractor()
+    texto_ejemplo = "TITULO PRINCIPAL:\n- Elemento 1\n- Elemento 2\nTexto normal del parrafo."
+    markdown = extractor._format_page_to_markdown(texto_ejemplo, 1)
+
+    assert "## Página 1" in markdown
+    assert "### TITULO PRINCIPAL" in markdown
+    assert "- Elemento 1" in markdown
+    assert "Texto normal del parrafo." in markdown
 
 
 def test_calculate_checksum_returns_sha256():
