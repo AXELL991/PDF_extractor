@@ -1,8 +1,29 @@
 # ============================================
 # SERVICIOS PDF EXTRACTOR - Docker Compose
+# Arquitectura con Traefik API Gateway
 # ============================================
 
 services:
+  # ----------------------------------------
+  # API Gateway / Reverse Proxy: Traefik
+  # ----------------------------------------
+  traefik:
+    image: traefik:v3.1
+    container_name: pdf-extractor-traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"                           # Dashboard UI activo en :8080
+      - "--providers.docker=true"                       # Lee labels de Docker
+      - "--providers.docker.exposedbydefault=false"     # Solo expone contenedores con traefik.enable=true
+      - "--entrypoints.web.address=:80"                 # Entrada HTTP principal
+    ports:
+      - "80:80"        # Entrada unificada para la API
+      - "8080:8080"    # Dashboard web interactivo de Traefik
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - pdf-extractor-network
+
   # ----------------------------------------
   # Servicio de Base de Datos: MongoDB
   # ----------------------------------------
@@ -28,7 +49,7 @@ services:
       start_period: 40s
 
   # ----------------------------------------
-  # Servicio de la API: FastAPI
+  # Servicio de la API: FastAPI (Enrutado por Traefik)
   # ----------------------------------------
   api:
     build:
@@ -36,17 +57,22 @@ services:
       dockerfile: Dockerfile
     container_name: pdf-extractor-api
     restart: unless-stopped
-    ports:
-      - "8000:8000"
     environment:
-      # Variables de entorno para la conexion a MongoDB
       MONGO_URI: mongodb://admin:admin123@mongodb:27017/pdf_extractor_db?authSource=admin
       MONGO_DB_NAME: pdf_extractor_db
+      ENVIRONMENT: development
+      ALLOWED_HOSTS: "localhost,127.0.0.1,traefik,pdf-extractor-api,*.utn.edu.ar,pdf-extractor.utn.edu.ar"
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
       - pdf-extractor-network
+    labels:
+      - "traefik.enable=true"
+      # Enrutar todo el tráfico HTTP que llega por el entrypoint web a la API
+      - "traefik.http.routers.api.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.services.api.loadbalancer.server.port=8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
       interval: 30s
