@@ -1,6 +1,7 @@
 """Caso de uso para procesar y persistir documentos PDF."""
 import io
 
+from app.core.config import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
 from app.database import MongoRepository
 from app.dtos import UploadResponse
 from app.exceptions import (
@@ -10,8 +11,20 @@ from app.exceptions import (
 )
 from app.services.pdf_extractor import PyPDFExtractor
 
-MAX_FILE_SIZE_MB = 5
-MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+def validar_tamano_archivo(file_size: int | None, content_bytes: bytes | None = None) -> None:
+    """Valida que el tamaño del archivo no exceda el límite permitido.
+
+    Única regla centralizada de validación de tamaño.
+    """
+    size = file_size
+    if size is None and content_bytes is not None:
+        size = len(content_bytes)
+    elif size is not None and content_bytes is not None:
+        size = max(size, len(content_bytes))
+
+    if (size or 0) > MAX_FILE_SIZE_BYTES:
+        raise TamañoExcedidoError(MAX_FILE_SIZE_MB)
 
 
 class ProcesarDocumentoUseCase:
@@ -29,7 +42,7 @@ class ProcesarDocumentoUseCase:
     ) -> UploadResponse:
         """Valida el PDF, extrae su texto y lo guarda en la base de datos."""
         self._validar_formato(filename)
-        self._validar_tamaño(file_size, content_bytes)
+        validar_tamano_archivo(file_size, content_bytes)
 
         archivo_en_ram = io.BytesIO(content_bytes)
         checksum = self.extractor.calculate_checksum(archivo_en_ram)
@@ -55,12 +68,6 @@ class ProcesarDocumentoUseCase:
         """Verifica que el archivo sea PDF."""
         if not filename or not filename.lower().endswith(".pdf"):
             raise FormatoInvalidoError()
-
-    def _validar_tamaño(self, file_size: int | None, content_bytes: bytes) -> None:
-        """Verifica que el archivo no exceda el tamaño maximo."""
-        size = max(file_size or 0, len(content_bytes))
-        if size > MAX_FILE_SIZE_BYTES:
-            raise TamañoExcedidoError(MAX_FILE_SIZE_MB)
 
     def _verificar_duplicado(self, checksum: str) -> None:
         """Verifica que el documento no exista ya en la base de datos."""

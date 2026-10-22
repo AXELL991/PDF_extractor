@@ -14,8 +14,8 @@ from app.core.config import ENVIRONMENT
 from app.core.rate_limit import limiter
 from app.core.security import is_valid_pdf, sanitize_filename, validate_checksum
 from app.dtos import ActualizarRequest, MensajeResponse, UploadResponse
-from app.exceptions import DocumentoNoEncontradoError, TamañoExcedidoError
-from app.use_cases.procesar_documento import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
+from app.exceptions import DocumentoNoEncontradoError
+from app.use_cases.procesar_documento import validar_tamano_archivo
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,22 @@ def build_router(get_db, use_case) -> APIRouter:
     caso de uso `ProcesarDocumentoUseCase`.
     """
     router = APIRouter()
+
+    def _obtener_documento_o_404(checksum: str) -> dict:
+        """Helper reutilizable para validar hash y asegurar existencia del documento.
+
+        Elimina el patrón repetido en GET, PUT y DELETE.
+        """
+        try:
+            validate_checksum(checksum)
+        except ValueError as e:
+            logger.warning(f"Checksum inválido recibido: {checksum}")
+            raise HTTPException(status_code=400, detail=str(e))
+
+        doc = get_db().obtener_por_checksum(checksum)
+        if not doc:
+            raise DocumentoNoEncontradoError()
+        return doc
 
     @router.get(
         "/",
@@ -101,12 +117,10 @@ def build_router(get_db, use_case) -> APIRouter:
         """
         logger.info(f"Iniciando upload de archivo: {file.filename}")
 
-        # --- Validación de tamaño antes de leer el contenido ---
-        if file.size and file.size > MAX_FILE_SIZE_BYTES:
-            logger.warning(f"Archivo excede tamaño máximo: {file.size} bytes")
-            raise TamañoExcedidoError(MAX_FILE_SIZE_MB)
+        # Validación unificada de tamaño antes de leer contenido si está disponible
+        validar_tamano_archivo(file.size)
 
-        # --- Validación y sanitización del nombre de archivo ---
+        # Validación y sanitización del nombre de archivo
         try:
             sanitized_name = sanitize_filename(file.filename or "")
         except ValueError as e:
@@ -115,13 +129,12 @@ def build_router(get_db, use_case) -> APIRouter:
 
         contents = await file.read()
 
-        # --- Validación por magic numbers (contenido realmente PDF) ---
+        # Validación por magic numbers (contenido realmente PDF)
         if not is_valid_pdf(contents):
             logger.warning("El contenido no tiene la firma magic de un PDF")
             raise HTTPException(status_code=400, detail="El archivo no es un PDF válido.")
 
-        # --- Lógica de negocio: checksum, duplicados, extracción y persistencia ---
-        # Se re-liga el repositorio del módulo para mantenerlo intercambiable (tests).
+        # Lógica de negocio: checksum, duplicados, extracción y persistencia
         use_case.db = get_db()
         return use_case.execute(
             filename=sanitized_name,
@@ -151,18 +164,10 @@ def build_router(get_db, use_case) -> APIRouter:
     @limiter.limit("60/minute")
     async def obtener_documento(checksum: str, request: Request):
         """Busca un documento específico utilizando su hash SHA-256."""
-        try:
-            validate_checksum(checksum)
-        except ValueError as e:
-            logger.warning(f"Checksum inválido recibido: {checksum}")
-            raise HTTPException(status_code=400, detail=str(e))
-
-        doc = get_db().obtener_por_checksum(checksum)
-        if not doc:
-            raise DocumentoNoEncontradoError()
-
-        doc.pop("_id", None)
-        return doc
+        doc = _obtener_documento_o_404(checksum)
+        doc_copy = dict(doc)
+        doc_copy.pop("_id", None)
+        return doc_copy
 
     @router.put(
         "/documentos/{checksum}",
@@ -175,14 +180,7 @@ def build_router(get_db, use_case) -> APIRouter:
         checksum: str, request: Request, datos: ActualizarRequest
     ):
         """Permite corregir el nombre de un archivo que ya fue guardado."""
-        try:
-            validate_checksum(checksum)
-        except ValueError as e:
-            logger.warning(f"Checksum inválido en PUT: {checksum}")
-            raise HTTPException(status_code=400, detail=str(e))
-
-        if not get_db().obtener_por_checksum(checksum):
-            raise DocumentoNoEncontradoError()
+        _obtener_documento_o_404(checksum)
 
         # Sanitizar el nuevo nombre
         try:
@@ -195,7 +193,8 @@ def build_router(get_db, use_case) -> APIRouter:
 
         return MensajeResponse(
             status="success",
-            message=f"Nombre actualizado a: {nuevo_nombre}")
+            message=f"Nombre actualizado a: {nuevo_nombre}",
+        )
 
     @router.delete(
         "/documentos/{checksum}",
@@ -206,21 +205,14 @@ def build_router(get_db, use_case) -> APIRouter:
     @limiter.limit("60/minute")
     async def borrar_documento(checksum: str, request: Request):
         """Elimina permanentemente un registro de la base de datos."""
-        try:
-            validate_checksum(checksum)
-        except ValueError as e:
-            logger.warning(f"Checksum inválido en DELETE: {checksum}")
-            raise HTTPException(status_code=400, detail=str(e))
-
-        if not get_db().obtener_por_checksum(checksum):
-            raise DocumentoNoEncontradoError()
+        _obtener_documento_o_404(checksum)
 
         get_db().eliminar_documento(checksum)
         logger.info(f"Documento {checksum[:16]}... eliminado")
 
         return MensajeResponse(
             status="success",
-            message="Documento eliminado de la base de datos."
+            message="Documento eliminado de la base de datos.",
         )
 
     return router

@@ -5,6 +5,10 @@ import os
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 LOG_LEVEL = os.getenv("LOGLEVEL", "INFO")
 
+# Configuración de tamaño de archivo (Única fuente de verdad)
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "5"))
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
 # Orígenes CORS permitidos (solo los configurados explícitamente)
 ALLOWED_ORIGINS = [
     origin.strip()
@@ -20,7 +24,7 @@ ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
         "ALLOWED_HOSTS",
-        "localhost,127.0.0.1,*.utn.edu.ar,pdf-extractor.utn.edu.ar",
+        "localhost,127.0.0.1,traefik,pdf-extractor-api,*.utn.edu.ar,pdf-extractor.utn.edu.ar",
     ).split(",")
     if host.strip()
 ]

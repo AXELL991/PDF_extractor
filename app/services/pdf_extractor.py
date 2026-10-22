@@ -1,7 +1,10 @@
 import hashlib
 import io
+import logging
 import re
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 
 class PyPDFExtractor:
@@ -21,7 +24,7 @@ class PyPDFExtractor:
 
             return "\n\n---\n\n".join(markdown_pages).strip()
         except Exception as e:
-            print(f"[!] Error en la extracción a Markdown: {e}")
+            logger.error(f"Error en la extracción a Markdown: {e}", exc_info=True)
             return ""
 
     def _format_page_to_markdown(self, text: str, page_number: int) -> str:
