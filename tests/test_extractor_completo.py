@@ -62,13 +62,17 @@ def test_checksum_different_content():
     assert hash1 != hash2
 
 
-def test_calculate_checksum_matches_hashlib():
-    """El checksum debe coincidir con hashlib.sha256."""
+def test_calculate_checksum_matches_literal():
+    """El checksum calculado debe coincidir con el hash SHA-256 pre-calculado.
+    Esto evita depender de la misma lógica de `hashlib` dentro del propio test.
+    """
     extractor = PyPDFExtractor()
+    # Contenido idéntico al usado para generar el hash literal
     data = b"datos de prueba para verificar"
     content = io.BytesIO(data)
 
-    expected = hashlib.sha256(data).hexdigest()
+    # Hash SHA-256 generado previamente con `hashlib.sha256(data).hexdigest()`
+    expected_literal = "3031af382c85802ddb5f99e73602bf7cef3379374d2dfe5ba1738df3a2c46f5b"
     actual = extractor.calculate_checksum(content)
 
-    assert actual == expected
+    assert actual == expected_literal
