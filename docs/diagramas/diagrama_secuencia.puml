@@ -1,15 +1,19 @@
 @startuml
-
 !theme plain
+hide footbox
 
+skinparam defaultFontSize 12
 skinparam sequenceArrowThickness 2
+skinparam wrapWidth 200
+skinparam maxMessageSize 260
+skinparam responseMessageBelowArrow false
+skinparam shadowing false
 
 skinparam sequence {
     ArrowColor #333333
     LifeLineBorderColor #666666
     LifeLineBackgroundColor #F0F0F0
     ParticipantBorderColor #333333
-    ParticipantBackgroundColor #E3F2FD
     ParticipantFontColor #000000
     ActorBackgroundColor #FFF3E0
     ActorBorderColor #333333
@@ -17,294 +21,96 @@ skinparam sequence {
     NoteBorderColor #FBC02D
 }
 
-skinparam wrapWidth 250
-skinparam maxMessageSize 300
-skinparam responseMessageBelowArrow true
-skinparam shadowing false
-
 skinparam participant {
-    BackgroundColor<<External>> #FFEBEE
-    BorderColor<<External>> #C62828
+    BackgroundColor<<Presentation>> #E3F2FD
+    BorderColor<<Presentation>> #1565C0
+    BackgroundColor<<Application>> #E8F5E9
+    BorderColor<<Application>> #2E7D32
+    BackgroundColor<<Infrastructure>> #E1F5FE
+    BorderColor<<Infrastructure>> #0277BD
 }
 
-skinparam participant {
-    BackgroundColor<<Service>> #E8F5E9
-    BorderColor<<Service>> #2E7D32
-}
+title Diagrama de Secuencia — API Extractor de PDFs (Clean Architecture)
 
-skinparam participant {
-    BackgroundColor<<Storage>> #E1F5FE
-    BorderColor<<Storage>> #0277BD
-}
-
-title Diagrama de Secuencia - API Extractor de PDFs
-
-actor "Usuario/Cliente" as User
-participant "API FastAPI\n(main.py)" as API <<External>>
-participant "PyPDFExtractor\n(pdf_extractor.py)" as Service <<Service>>
-participant "MongoRepository\n(database.py)" as DB <<Storage>>
+actor "Cliente HTTP" as User
+participant "API\nroutes.py" as API <<Presentation>>
+participant "ProcesarDocumento\nUseCase" as UC <<Application>>
+participant "CRUD\nUseCases" as CRUD <<Application>>
+participant "Checksum\nCalculator" as Checksum <<Infrastructure>>
+participant "PyPDF\nExtractor" as Extractor <<Infrastructure>>
+participant "Mongo\nRepository" as Repo <<Infrastructure>>
 database "MongoDB" as Mongo
 
-== Flujo Principal: Subir y Procesar un PDF ==
+note over API, UC: create_app() publica dependencias; Depends() arma el caso de uso.\nSanitización y validación PDF: app/core/security.
 
-User -> API : POST /upload (PDF)
-activate API #E3F2FD
-
-alt Formato invalido
-    API --> User : "400 Bad Request: El archivo proporcionado no es PDF."
-
-else Formato valido
-
-    note right of API
-        Verifica que el archivo
-        termine en ".pdf"
-    end note
-
-    alt Archivo muy grande
-
-        API --> User : "413 Payload Too Large: El archivo supera los 5MB."
-
-    else Tamano valido
-
-        note right of API
-            Verifica que el tamano
-            sea menor a 5MB
-        end note
-
-        API -> API : Leer bytes del archivo en RAM
-
-        note right of API
-            io.BytesIO guarda el archivo
-            en memoria sin usar disco
-        end note
-
-        API -> Service : calculate_checksum(bytes)
-
-        activate Service #E8F5E9
-
-        Service -> Service : file.seek(0) + sha256
-
-        Service --> API : checksum SHA-256
-
-        deactivate Service
-
-        API -> DB : obtener_por_checksum(checksum)
-
-        activate DB #E1F5FE
-
-        DB -> Mongo : find_one({"hash_seguridad": ...})
-
-        activate Mongo
-
-        Mongo --> DB : documento
-
-        deactivate Mongo
-
-        DB --> API : documento o None
-
-        deactivate DB
-
-        alt Documento duplicado
-
-            API --> User : "409 Conflict: Este PDF ya fue procesado."
-
-        else Documento nuevo
-
-            API -> Service : extract(bytes)
-
-            activate Service #E8F5E9
-
-            Service -> Service : PdfReader(pages) -> texto
-
-            Service --> API : texto_extraido
-
-            deactivate Service
-
-            API -> DB : guardar_documento(nombre, texto, checksum)
-
-            activate DB #E1F5FE
-
-            DB -> Mongo : insert_one(documento)
-
-            activate Mongo
-
-            Mongo --> DB : resultado insert
-
-            deactivate Mongo
-
-            DB --> API : resultado
-
-            deactivate DB
-
-            API --> User : "200 OK: UploadResponse"
-
-            note right of API
-                {
-                  "status": "success",
-                  "message": "Documento procesado",
-                  "filename": "...",
-                  "sha256": "..."
-                }
-            end note
-
-        end
+== POST /upload — ProcesarDocumentoUseCase ==
+User -> API : POST /upload (multipart PDF)
+activate API
+API -> API : leer bytes en RAM
+API -> UC : execute(filename, bytes, size)
+activate UC
+UC -> UC : validar tamaño / nombre / PDF
+alt Validación falla
+    UC --> API : DomainException (400/413)
+    note right of UC: 413 tamaño / 400 nombre / 400 formato
+    API --> User : 4xx {"detail": mensaje}
+else Validación OK
+    UC -> Checksum : calculate(bytes)
+    Checksum --> UC : sha256
+    UC -> Repo : obtener_por_checksum(sha256)
+    Repo -> Mongo : find_one({hash_seguridad})
+    Mongo --> Repo : documento | None
+    Repo --> UC : Documento | None
+    alt Documento duplicado
+        UC --> API : DocumentoDuplicadoError (409)
+        API --> User : 409 {"detail": mensaje}
+    else Documento nuevo
+        UC -> Extractor : extract(BytesIO)
+        Extractor --> UC : texto_markdown
+        note right of Extractor: 422 si pypdf falla
+        UC -> UC : sanitize_text(texto)
+        UC -> Repo : guardar_documento(Documento)
+        Repo -> Mongo : insert_one(documento)
+        Mongo --> Repo : resultado
+        Repo --> UC : ok
+        UC --> API : ResultadoDocumento
+        API -> API : UploadResponse(...)
+        API --> User : 200 {"status": "success", ...}
     end
 end
-
+deactivate UC
 deactivate API
 
-== Operaciones CRUD Adicionales ==
+== CRUD — Listar / Obtener / Actualizar / Eliminar ==
+User -> API : GET/PUT/DELETE /documentos...
+activate API
+API -> CRUD : <UseCase>.execute(...)
+CRUD -> CRUD : validar checksum / existencia\nsanitize_filename (PUT)
+CRUD -> Repo : listar / obtener / actualizar / eliminar
+Repo -> Mongo : find / update_one / delete_one
+Repo --> CRUD : Documento(s) | ok
+CRUD --> API : DTO / resultado
+API -> API : DTO de respuesta
+API --> User : 200 / 400 / 404
+deactivate API
+note right of CRUD: 400 checksum/nombre inválido\n404 no encontrado
 
-User -> API : GET /documentos
-
-activate API #E3F2FD
-
-API -> DB : listar_todos()
-
-activate DB #E1F5FE
-
-DB -> Mongo : find({}, {"_id": 0})
-
-activate Mongo
-
-Mongo --> DB : lista documentos
-
-deactivate Mongo
-
-DB --> API : documentos
-
-deactivate DB
-
-API --> User : "200 OK: {total, documentos}"
-
+== GET /health ==
+User -> API : GET /health
+activate API
+API -> Repo : ping()
+Repo -> Mongo : admin.command("ping")
+Repo --> API : ok | excepción
+API --> User : 200 healthy | 503 unhealthy
 deactivate API
 
-User -> API : GET /documentos/{checksum}
-
-activate API #E3F2FD
-
-API -> DB : obtener_por_checksum(checksum)
-
-activate DB #E1F5FE
-
-DB -> Mongo : find_one({...})
-
-activate Mongo
-
-Mongo --> DB : documento o None
-
-deactivate Mongo
-
-DB --> API : documento
-
-deactivate DB
-
-alt Documento no encontrado
-
-    API --> User : "404 Not Found"
-
-else Documento encontrado
-
-    API --> User : "200 OK: documento"
-
-end
-
-deactivate API
-
-User -> API : PUT /documentos/{checksum} (nuevo_nombre)
-
-activate API #E3F2FD
-
-API -> DB : obtener_por_checksum(checksum)
-
-activate DB #E1F5FE
-
-DB -> Mongo : find_one({...})
-
-activate Mongo
-
-Mongo --> DB : documento
-
-deactivate Mongo
-
-DB --> API : documento
-
-deactivate DB
-
-alt Documento no encontrado
-
-    API --> User : "404 Not Found"
-
-else Documento encontrado
-
-    API -> DB : actualizar_nombre(checksum, nuevo_nombre)
-
-    activate DB #E1F5FE
-
-    DB -> Mongo : update_one({...}, {$set: {...}})
-
-    activate Mongo
-
-    Mongo --> DB : resultado
-
-    deactivate Mongo
-
-    DB --> API : resultado
-
-    deactivate DB
-
-    API --> User : "200 OK: Nombre actualizado"
-
-end
-
-deactivate API
-
-User -> API : DELETE /documentos/{checksum}
-
-activate API #E3F2FD
-
-API -> DB : obtener_por_checksum(checksum)
-
-activate DB #E1F5FE
-
-DB -> Mongo : find_one({...})
-
-activate Mongo
-
-Mongo --> DB : documento
-
-deactivate Mongo
-
-DB --> API : documento
-
-deactivate DB
-
-alt Documento no encontrado
-
-    API --> User : "404 Not Found"
-
-else Documento encontrado
-
-    API -> DB : eliminar_documento(checksum)
-
-    activate DB #E1F5FE
-
-    DB -> Mongo : delete_one({...})
-
-    activate Mongo
-
-    Mongo --> DB : resultado
-
-    deactivate Mongo
-
-    DB --> API : resultado
-
-    deactivate DB
-
-    API --> User : "200 OK: Documento eliminado"
-
-end
-
-deactivate API
-
+note over API: DomainException -> exception_handlers.py -> JSON {"detail": mensaje}.
+
+legend right
+  **Capas**
+  Azul: presentación (FastAPI)
+  Verde: aplicación (casos de uso)
+  Celeste: infraestructura (adaptadores)
+  Dominio: Documento + excepciones
+end legend
 @enduml
