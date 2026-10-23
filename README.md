@@ -58,6 +58,11 @@ API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**.
         └────────────────────────┘       └──────────────────────┘
 ```
 
+### 📚 Documentación de arquitectura
+
+- [`CONTEXT.md`](CONTEXT.md) — propósito, mapa de capas, glosario, seams y guía de ejecución.
+- [`docs/adr/001-clean-architecture-y-seams.md`](docs/adr/001-clean-architecture-y-seams.md) — decisión de Clean Architecture, inyección de dependencias y fakes.
+
 ---
 
 ## 🚀 Instalación y Configuración
@@ -77,6 +82,10 @@ cp .env.example .env
 # Sincronizar dependencias e instalar entorno virtual
 uv sync
 ```
+
+> En producción (`ENVIRONMENT=production`) `SESSION_SECRET_KEY` es obligatoria.
+> La aplicación falla rápido al iniciar si no está definida. Toda la configuración
+> de entorno se centraliza en `app/core/config.py`.
 
 ### 3. Levantar Todo con Docker Compose (Traefik + Mongo + API)
 

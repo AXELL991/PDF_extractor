@@ -1,12 +1,12 @@
 """Middlewares HTTP: cabeceras de seguridad, validación de IP y logging."""
 
 import logging
-import os
 import time
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.core.config import ENFORCE_IP_VALIDATION
 from app.core.security import generate_csrf_token, is_safe_ip
 
 logger = logging.getLogger(__name__)
@@ -50,8 +50,8 @@ async def security_middleware(request: Request, call_next):
         },
     )
 
-    # Validar IP contra redes seguras (opcional, configurable vía env)
-    if os.getenv("ENFORCE_IP_VALIDATION", "false").lower() == "true":
+    # Validar IP contra redes seguras (opcional, configurable en config.py)
+    if ENFORCE_IP_VALIDATION:
         if not is_safe_ip(client_ip):
             logger.warning(f"IP no autorizada: {client_ip}")
             return JSONResponse(

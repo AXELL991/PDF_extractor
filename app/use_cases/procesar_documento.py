@@ -1,15 +1,22 @@
 """Caso de uso para procesar y persistir documentos PDF."""
+
 import io
 
 from app.core.config import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
+from app.core.security import is_valid_pdf, sanitize_filename, sanitize_text
 from app.database import MongoRepository
 from app.dtos import Documento, UploadResponse
 from app.exceptions import (
     DocumentoDuplicadoError,
     FormatoInvalidoError,
+    NombreArchivoInvalidoError,
     TamañoExcedidoError,
 )
 from app.services.pdf_extractor import PyPDFExtractor
+
+# Valor de dominio para PDFs sin texto extraíble. Se mantiene el literal
+# histórico para no cambiar el contrato de la API.
+TEXTO_VACIO = "Vacio"
 
 
 def validar_tamano_archivo(file_size: int | None, content_bytes: bytes | None = None) -> None:
@@ -38,11 +45,14 @@ class ProcesarDocumentoUseCase:
         self,
         filename: str,
         content_bytes: bytes,
-        file_size: int | None,
+        file_size: int | None = None,
     ) -> UploadResponse:
         """Valida el PDF, extrae su texto y lo guarda en la base de datos."""
-        self._validar_formato(filename)
         validar_tamano_archivo(file_size, content_bytes)
+        nombre_sanitizado = self._sanitizar_nombre(filename)
+
+        if not is_valid_pdf(content_bytes):
+            raise FormatoInvalidoError("El archivo no es un PDF válido.")
 
         archivo_en_ram = io.BytesIO(content_bytes)
         checksum = self.extractor.calculate_checksum(archivo_en_ram)
@@ -50,11 +60,12 @@ class ProcesarDocumentoUseCase:
 
         archivo_en_ram.seek(0)
         texto_extraido = self.extractor.extract(archivo_en_ram)
+        texto_seguro = sanitize_text(texto_extraido)
 
         self.db.guardar_documento(
             Documento(
-                archivo=filename,
-                texto=texto_extraido if texto_extraido else "Vacio",
+                archivo=nombre_sanitizado,
+                texto=texto_seguro if texto_seguro else TEXTO_VACIO,
                 hash_seguridad=checksum,
             )
         )
@@ -62,14 +73,16 @@ class ProcesarDocumentoUseCase:
         return UploadResponse(
             status="success",
             message="Documento procesado y guardado correctamente.",
-            filename=filename,
+            filename=nombre_sanitizado,
             sha256=checksum,
         )
 
-    def _validar_formato(self, filename: str) -> None:
-        """Verifica que el archivo sea PDF."""
-        if not filename or not filename.lower().endswith(".pdf"):
-            raise FormatoInvalidoError()
+    def _sanitizar_nombre(self, filename: str) -> str:
+        """Sanitiza y valida que el nombre corresponda a un PDF."""
+        try:
+            return sanitize_filename(filename)
+        except ValueError as exc:
+            raise NombreArchivoInvalidoError(str(exc)) from exc
 
     def _verificar_duplicado(self, checksum: str) -> None:
         """Verifica que el documento no exista ya en la base de datos."""

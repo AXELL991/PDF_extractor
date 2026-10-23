@@ -1,22 +1,15 @@
-import os
-
-from dotenv import load_dotenv
 from pymongo import MongoClient
 
+from app.core.config import MONGO_DB_NAME, MONGO_URI
 from app.dtos import Documento
-
-load_dotenv()
 
 
 class MongoRepository:
     """Adaptador de persistencia: traduce entre MongoDB y el dominio."""
 
     def __init__(self):
-        uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-        db_name = os.getenv("MONGO_DB_NAME", "pdf_extractor_db")
-
-        self.client = MongoClient(uri)
-        self.db = self.client[db_name]
+        self.client = MongoClient(MONGO_URI)
+        self.db = self.client[MONGO_DB_NAME]
         self.coleccion = self.db["documentos"]
 
     def obtener_por_checksum(self, checksum: str) -> Documento | None:
