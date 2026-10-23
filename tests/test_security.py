@@ -52,7 +52,7 @@ def _minimal_pdf_bytes():
     """Return a tiny valid PDF (just the header and EOF) as bytes.
     This is sufficient for `is_valid_pdf` which only checks magic numbers.
     """
-    return b"%PDF-1.4\n%âãÏÓ\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+    return b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
 
 
 def test_is_valid_pdf_true():

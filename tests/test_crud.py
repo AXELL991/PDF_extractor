@@ -4,7 +4,6 @@ These tests no longer patch `app.main.db`; instead they construct a lightweight
 the use case and router.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock
 

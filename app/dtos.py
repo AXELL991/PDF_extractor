@@ -2,17 +2,17 @@ from pydantic import BaseModel
 from typing import List
 
 
-class DocumentoResponse(BaseModel):
-    """DTO para respuestas de documentos individuales."""
+class Documento(BaseModel):
+    """Entidad/DTO de un documento persistido."""
     archivo: str
-    texto: str
+    texto: str = ""
     hash_seguridad: str
 
 
 class ListaDocumentosResponse(BaseModel):
     """DTO para listar todos los documentos."""
     total: int
-    documentos: List[dict]
+    documentos: List[Documento]
 
 
 class UploadResponse(BaseModel):

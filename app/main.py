@@ -29,7 +29,16 @@ db = MongoRepository()
 extractor = PyPDFExtractor()
 procesar_doc_use_case = ProcesarDocumentoUseCase(extractor=extractor, db=db)
 
-app = FastAPI(
+
+class AplicacionExtractor(FastAPI):
+    """Aplicación FastAPI con el manejo uniforme de errores de dominio."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.add_exception_handler(DomainException, domain_exception_handler)
+
+
+app = AplicacionExtractor(
     title="Extractor de PDF - UTN San Rafael",
     description="API segura para extracción de texto de PDFs con persistencia en MongoDB.",
     version="2.0.0",
@@ -38,7 +47,6 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_exception_handler(DomainException, domain_exception_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,

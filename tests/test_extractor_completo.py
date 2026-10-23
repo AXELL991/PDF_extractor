@@ -1,6 +1,5 @@
 """Tests completos para el extractor de PDF a Markdown."""
 import io
-import hashlib
 from app.services.pdf_extractor import PyPDFExtractor
 
 

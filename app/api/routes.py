@@ -13,7 +13,13 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from app.core.config import ENVIRONMENT
 from app.core.rate_limit import limiter
 from app.core.security import is_valid_pdf, sanitize_filename, validate_checksum
-from app.dtos import ActualizarRequest, MensajeResponse, UploadResponse
+from app.dtos import (
+    ActualizarRequest,
+    Documento,
+    ListaDocumentosResponse,
+    MensajeResponse,
+    UploadResponse,
+)
 from app.exceptions import DocumentoNoEncontradoError
 from app.use_cases.procesar_documento import validar_tamano_archivo
 
@@ -29,7 +35,7 @@ def build_router(get_db, use_case) -> APIRouter:
     """
     router = APIRouter()
 
-    def _obtener_documento_o_404(checksum: str) -> dict:
+    def _obtener_documento_o_404(checksum: str) -> Documento:
         """Helper reutilizable para validar hash y asegurar existencia del documento.
 
         Elimina el patrón repetido en GET, PUT y DELETE.
@@ -41,7 +47,7 @@ def build_router(get_db, use_case) -> APIRouter:
             raise HTTPException(status_code=400, detail=str(e))
 
         doc = get_db().obtener_por_checksum(checksum)
-        if not doc:
+        if doc is None:
             raise DocumentoNoEncontradoError()
         return doc
 
@@ -78,7 +84,7 @@ def build_router(get_db, use_case) -> APIRouter:
         }
 
         try:
-            get_db().client.admin.command("ping")
+            get_db().ping()
             health_status["database"] = "connected"
         except Exception as e:
             logger.error(f"Error de conexión a MongoDB: {e}")
@@ -146,28 +152,25 @@ def build_router(get_db, use_case) -> APIRouter:
         "/documentos",
         tags=["Documentos (CRUD)"],
         summary="2. Leer: Listar todos los PDFs",
-        response_class=JSONResponse,
+        response_model=ListaDocumentosResponse,
     )
     @limiter.limit("60/minute")
-    async def listar_documentos(request: Request):
+    async def listar_documentos(request: Request) -> ListaDocumentosResponse:
         """Devuelve una lista con todos los documentos procesados hasta ahora."""
         documentos = get_db().listar_todos()
         logger.info(f"Listados {len(documentos)} documentos")
-        return {"total": len(documentos), "documentos": documentos}
+        return ListaDocumentosResponse(total=len(documentos), documentos=documentos)
 
     @router.get(
         "/documentos/{checksum}",
         tags=["Documentos (CRUD)"],
         summary="2. Leer: Buscar por Hash",
-        response_class=JSONResponse,
+        response_model=Documento,
     )
     @limiter.limit("60/minute")
-    async def obtener_documento(checksum: str, request: Request):
+    async def obtener_documento(checksum: str, request: Request) -> Documento:
         """Busca un documento específico utilizando su hash SHA-256."""
-        doc = _obtener_documento_o_404(checksum)
-        doc_copy = dict(doc)
-        doc_copy.pop("_id", None)
-        return doc_copy
+        return _obtener_documento_o_404(checksum)
 
     @router.put(
         "/documentos/{checksum}",

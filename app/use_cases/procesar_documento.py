@@ -3,7 +3,7 @@ import io
 
 from app.core.config import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
 from app.database import MongoRepository
-from app.dtos import UploadResponse
+from app.dtos import Documento, UploadResponse
 from app.exceptions import (
     DocumentoDuplicadoError,
     FormatoInvalidoError,
@@ -52,9 +52,11 @@ class ProcesarDocumentoUseCase:
         texto_extraido = self.extractor.extract(archivo_en_ram)
 
         self.db.guardar_documento(
-            filename,
-            texto_extraido if texto_extraido else "Vacio",
-            checksum,
+            Documento(
+                archivo=filename,
+                texto=texto_extraido if texto_extraido else "Vacio",
+                hash_seguridad=checksum,
+            )
         )
 
         return UploadResponse(
@@ -71,5 +73,5 @@ class ProcesarDocumentoUseCase:
 
     def _verificar_duplicado(self, checksum: str) -> None:
         """Verifica que el documento no exista ya en la base de datos."""
-        if self.db.obtener_por_checksum(checksum):
+        if self.db.obtener_por_checksum(checksum) is not None:
             raise DocumentoDuplicadoError()
