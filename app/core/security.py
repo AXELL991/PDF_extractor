@@ -4,6 +4,7 @@ Contiene funciones de hardening, validación de archivos,
 sanitización de inputs y validación de checksums.
 """
 
+import io
 import ipaddress
 import logging
 import os
@@ -12,6 +13,7 @@ import secrets
 from typing import Optional
 
 import bleach
+from pypdf import PdfReader
 
 # ---------------------------------------------------------------------------
 #  Configuración del logger de seguridad
@@ -50,6 +52,13 @@ def sanitize_filename(filename: str) -> str:
         raise ValueError("Nombre de archivo inválido o no es un PDF.")
 
     return filename
+
+
+def sanitize_text(text: str) -> str:
+    """Elimina HTML/JS del texto extraído, preservando el texto plano y Markdown."""
+    if not text:
+        return ""
+    return bleach.clean(text, tags=[], strip=True)
 
 
 def validate_checksum(checksum: str) -> None:
@@ -93,19 +102,28 @@ def is_safe_ip(client_ip: str, allowed_networks: Optional[list] = None) -> bool:
 # ---------------------------------------------------------------------------
 def is_valid_pdf(content: bytes) -> bool:
     """
-    Verifica que el contenido sea un PDF válido usando magic numbers.
-    Chequea que comience con %PDF- o con el magic number binario de PDF.
+    Verifica que el contenido sea un PDF real.
+
+    Primero exige el magic number y luego intenta parsear el documento con
+    pypdf. Un archivo que solo copia la cabecera ``%PDF-`` pero está corrupto
+    no se considera válido.
     """
     if not content:
         logger.warning("Contenido de archivo vacío.")
         return False
 
-    for magic in PDF_MAGIC_NUMBERS:
-        if content.startswith(magic):
-            return True
+    if not any(content.startswith(magic) for magic in PDF_MAGIC_NUMBERS):
+        logger.warning("Magic number de PDF no detectado.")
+        return False
 
-    logger.warning("Magic number de PDF no detectado.")
-    return False
+    try:
+        reader = PdfReader(io.BytesIO(content))
+        # Forzar la lectura del árbol de páginas para detectar PDFs truncados.
+        _ = len(reader.pages)
+        return True
+    except Exception as exc:
+        logger.warning(f"PDF no parseable: {exc}")
+        return False
 
 
 # ---------------------------------------------------------------------------

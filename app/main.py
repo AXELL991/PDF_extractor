@@ -1,7 +1,6 @@
 """Composition root: instancia FastAPI, configura los middlewares de seguridad
 y expone los endpoints definidos en `app.api.routes`.
 """
-import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +12,13 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes import build_router
-from app.core.config import ALLOWED_HOSTS, ALLOWED_ORIGINS, ENVIRONMENT, LOG_LEVEL
+from app.core.config import (
+    ALLOWED_HOSTS,
+    ALLOWED_ORIGINS,
+    ENVIRONMENT,
+    LOG_LEVEL,
+    get_session_secret_key,
+)
 from app.core.exception_handlers import domain_exception_handler
 from app.core.logging_config import setup_logging
 from app.core.middleware import security_middleware
@@ -21,13 +26,14 @@ from app.core.rate_limit import limiter
 from app.database import MongoRepository
 from app.exceptions import DomainException
 from app.services.pdf_extractor import PyPDFExtractor
-from app.use_cases.procesar_documento import ProcesarDocumentoUseCase
 
 setup_logging(log_level=LOG_LEVEL, environment=ENVIRONMENT)
 
+# Fallar rápido si la configuración de producción está incompleta.
+session_secret_key = get_session_secret_key()
+
 db = MongoRepository()
 extractor = PyPDFExtractor()
-procesar_doc_use_case = ProcesarDocumentoUseCase(extractor=extractor, db=db)
 
 
 class AplicacionExtractor(FastAPI):
@@ -60,11 +66,16 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SESSION_SECRET_KEY", os.urandom(32).hex()),
+    secret_key=session_secret_key,
     session_cookie="session_id",
     max_age=1800,
     same_site="lax",
     https_only=ENVIRONMENT == "production",
 )
 app.add_middleware(BaseHTTPMiddleware, dispatch=security_middleware)
-app.include_router(build_router(lambda: db, procesar_doc_use_case))
+
+# Dependencias publicadas para los proveedores de `app.api.dependencies`.
+app.state.repositorio = db
+app.state.extractor = extractor
+
+app.include_router(build_router())
