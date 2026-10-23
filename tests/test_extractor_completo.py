@@ -3,14 +3,13 @@ import io
 from app.services.pdf_extractor import PyPDFExtractor
 
 
-def test_extract_text_from_pdf():
-    """Verifica que el extractor devuelva un string en formato Markdown."""
+def test_extract_text_from_pdf(pdf_con_texto):
+    """Verifica que el extractor devuelva el texto real de un PDF válido."""
     extractor = PyPDFExtractor()
-    fake_pdf = io.BytesIO(b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF")
+    resultado = extractor.extract(io.BytesIO(pdf_con_texto))
 
-    resultado = extractor.extract(fake_pdf)
-
-    assert isinstance(resultado, str)
+    assert "Hola PDF de prueba" in resultado
+    assert "## Página 1" in resultado
 
 
 def test_format_page_to_markdown():

@@ -5,9 +5,12 @@ application server or database.
 
 import pytest
 from app.core.security import (
-    sanitize_filename,
-    validate_checksum,
+    generate_csrf_token,
+    is_safe_ip,
     is_valid_pdf,
+    sanitize_filename,
+    sanitize_text,
+    validate_checksum,
 )
 
 
@@ -48,16 +51,54 @@ def test_validate_checksum(checksum, valid):
             validate_checksum(checksum)
 
 
-def _minimal_pdf_bytes():
-    """Return a tiny valid PDF (just the header and EOF) as bytes.
-    This is sufficient for `is_valid_pdf` which only checks magic numbers.
-    """
-    return b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF"
+def test_sanitize_text_removes_html():
+    resultado = sanitize_text("<script>alert('xss')</script>Hola <b>mundo</b>")
+    assert "<script>" not in resultado
+    assert "<b>" not in resultado
+    assert "Hola" in resultado
 
 
-def test_is_valid_pdf_true():
-    assert is_valid_pdf(_minimal_pdf_bytes())
+def test_is_valid_pdf_true(pdf_con_texto):
+    assert is_valid_pdf(pdf_con_texto)
 
 
 def test_is_valid_pdf_false():
     assert not is_valid_pdf(b"not a pdf")
+
+
+def test_is_valid_pdf_rejects_header_only():
+    assert not is_valid_pdf(b"%PDF-1.4 contenido corrupto")
+
+
+def test_is_valid_pdf_rejects_empty_content():
+    assert not is_valid_pdf(b"")
+
+
+@pytest.mark.parametrize(
+    "client_ip,expected",
+    [
+        ("127.0.0.1", True),
+        ("10.1.2.3", True),
+        ("172.16.0.1", True),
+        ("192.168.1.25", True),
+        ("::1", True),
+        ("8.8.8.8", False),
+        ("172.32.0.1", False),
+        ("no-es-una-ip", False),
+    ],
+)
+def test_is_safe_ip_default_networks(client_ip, expected):
+    assert is_safe_ip(client_ip) is expected
+
+
+def test_is_safe_ip_custom_networks():
+    assert is_safe_ip("203.0.113.10", ["203.0.113.0/24"])
+    assert not is_safe_ip("198.51.100.10", ["203.0.113.0/24"])
+
+
+def test_generate_csrf_token_es_unico_y_seguro():
+    primero = generate_csrf_token()
+    segundo = generate_csrf_token()
+
+    assert primero != segundo
+    assert len(primero) >= 32

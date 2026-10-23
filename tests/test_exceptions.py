@@ -1,4 +1,5 @@
 """Tests para excepciones personalizadas."""
+from app.core.config import MAX_FILE_SIZE_MB
 from app.exceptions import (
     DomainException,
     FormatoInvalidoError,
@@ -26,11 +27,11 @@ def test_formato_invalido_error():
 
 
 def test_tamaño_excedido_error_default():
-    """Error de tamaño por defecto es 5MB."""
+    """Error de tamaño usa el límite centralizado de configuración."""
     exc = TamañoExcedidoError()
 
     assert exc.status_code == 413
-    assert "5MB" in exc.message
+    assert f"{MAX_FILE_SIZE_MB}MB" in exc.message
 
 
 def test_tamaño_excedido_error_custom():
