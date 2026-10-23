@@ -1,9 +1,9 @@
 """Fakes compartidos por los tests de casos de uso y de contrato HTTP."""
 
-from app.api.routes import build_router
-from app.dtos import Documento
-from app.main import app as base_app
-from app.services.pdf_extractor import PyPDFExtractor
+from dataclasses import replace
+
+from app.domain.entities import Documento
+from app.main import create_app
 
 
 class FakeRepo:
@@ -32,9 +32,7 @@ class FakeRepo:
         self.llamadas.append(("actualizar_nombre", checksum, nuevo_nombre))
         documento = self.documentos.get(checksum)
         if documento is not None:
-            self.documentos[checksum] = documento.model_copy(
-                update={"archivo": nuevo_nombre}
-            )
+            self.documentos[checksum] = replace(documento, archivo=nuevo_nombre)
 
     def eliminar_documento(self, checksum: str) -> None:
         self.llamadas.append(("eliminar_documento", checksum))
@@ -51,31 +49,40 @@ class FakeExtractor:
 
     def __init__(
         self,
-        checksum: str = "a" * 64,
         texto: str = "Texto extraído",
         llamadas: list[tuple] | None = None,
     ):
-        self.checksum = checksum
         self.texto = texto
         self.llamadas = llamadas if llamadas is not None else []
-
-    def calculate_checksum(self, file_stream) -> str:
-        self.llamadas.append(("calcular_checksum",))
-        return self.checksum
 
     def extract(self, file_stream) -> str:
         self.llamadas.append(("extraer",))
         return self.texto
 
 
-def build_test_app(repositorio: FakeRepo, extractor=None):
-    """Monta la app real con dependencias de test publicadas en app.state."""
-    test_app = base_app.__class__(
-        title=base_app.title,
-        description=base_app.description,
-        version=base_app.version,
-    )
-    test_app.state.repositorio = repositorio
-    test_app.state.extractor = extractor or PyPDFExtractor()
-    test_app.include_router(build_router())
+class FakeChecksumCalculator:
+    """Calculador de checksum controlable para tests de aplicación."""
+
+    def __init__(
+        self,
+        checksum: str = "a" * 64,
+        llamadas: list[tuple] | None = None,
+    ):
+        self.checksum = checksum
+        self.llamadas = llamadas if llamadas is not None else []
+
+    def calculate(self, content: bytes) -> str:
+        self.llamadas.append(("calcular_checksum",))
+        return self.checksum
+
+
+def build_test_app(
+    repositorio: FakeRepo,
+    extractor=None,
+    checksum_calculator=None,
+):
+    """Monta la app real con dependencias de test inyectadas por la factory."""
+    test_app = create_app(repositorio=repositorio, extractor=extractor)
+    if checksum_calculator is not None:
+        test_app.state.checksum_calculator = checksum_calculator
     return test_app

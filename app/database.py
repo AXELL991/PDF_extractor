@@ -1,7 +1,18 @@
+from dataclasses import asdict
+
 from pymongo import MongoClient
 
 from app.core.config import MONGO_DB_NAME, MONGO_URI
-from app.dtos import Documento
+from app.domain.entities import Documento
+
+
+def _a_documento(doc: dict) -> Documento:
+    """Traduce un documento de MongoDB a la entidad pura de dominio."""
+    return Documento(
+        archivo=doc["archivo"],
+        texto=doc.get("texto", ""),
+        hash_seguridad=doc["hash_seguridad"],
+    )
 
 
 class MongoRepository:
@@ -15,11 +26,11 @@ class MongoRepository:
     def obtener_por_checksum(self, checksum: str) -> Documento | None:
         """Busca un documento por su hash y lo devuelve como entidad de dominio."""
         doc = self.coleccion.find_one({"hash_seguridad": checksum})
-        return Documento.model_validate(doc) if doc else None
+        return _a_documento(doc) if doc else None
 
     def guardar_documento(self, documento: Documento) -> None:
         """Persiste una entidad de dominio en la colección."""
-        self.coleccion.insert_one(documento.model_dump())
+        self.coleccion.insert_one(asdict(documento))
 
     def actualizar_nombre(self, checksum: str, nuevo_nombre: str) -> None:
         """Actualiza el nombre de un documento."""
@@ -34,7 +45,7 @@ class MongoRepository:
 
     def listar_todos(self) -> list[Documento]:
         """Devuelve todos los documentos como entidades de dominio."""
-        return [Documento.model_validate(doc) for doc in self.coleccion.find({})]
+        return [_a_documento(doc) for doc in self.coleccion.find({})]
 
     def ping(self) -> None:
         """Comprueba la conectividad con MongoDB."""

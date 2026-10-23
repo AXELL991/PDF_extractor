@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from app.core.config import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
 from app.core.security import is_valid_pdf, sanitize_filename, sanitize_text
 from app.database import MongoRepository
-from app.dtos import Documento
+from app.domain.entities import Documento
 from app.exceptions import (
     DocumentoDuplicadoError,
     FormatoInvalidoError,
     NombreArchivoInvalidoError,
     TamañoExcedidoError,
 )
+from app.services.checksum import ChecksumCalculator
 from app.services.pdf_extractor import PyPDFExtractor
 
 # Valor de dominio para PDFs sin texto extraíble. Se mantiene el literal
@@ -48,9 +49,15 @@ def validar_tamano_archivo(
 class ProcesarDocumentoUseCase:
     """Orquesta la validacion, extraccion y persistencia de un PDF."""
 
-    def __init__(self, extractor: PyPDFExtractor, db: MongoRepository):
+    def __init__(
+        self,
+        extractor: PyPDFExtractor,
+        db: MongoRepository,
+        checksum_calculator: ChecksumCalculator,
+    ):
         self.extractor = extractor
         self.db = db
+        self.checksum_calculator = checksum_calculator
 
     def execute(
         self,
@@ -65,11 +72,10 @@ class ProcesarDocumentoUseCase:
         if not is_valid_pdf(content_bytes):
             raise FormatoInvalidoError("El archivo no es un PDF válido.")
 
-        archivo_en_ram = io.BytesIO(content_bytes)
-        checksum = self.extractor.calculate_checksum(archivo_en_ram)
+        checksum = self.checksum_calculator.calculate(content_bytes)
         self._verificar_duplicado(checksum)
 
-        archivo_en_ram.seek(0)
+        archivo_en_ram = io.BytesIO(content_bytes)
         texto_extraido = self.extractor.extract(archivo_en_ram)
         texto_seguro = sanitize_text(texto_extraido)
 

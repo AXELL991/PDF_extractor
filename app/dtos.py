@@ -1,9 +1,14 @@
-from pydantic import BaseModel
-from typing import List
+"""Esquemas Pydantic de transferencia de la capa API."""
+
+from pydantic import BaseModel, ConfigDict
+
+from app.domain.entities import Documento as DocumentoDominio
 
 
-class Documento(BaseModel):
-    """Entidad/DTO de un documento persistido."""
+class DocumentoResponse(BaseModel):
+    """Representación HTTP de un documento persistido."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     archivo: str
     texto: str = ""
@@ -14,7 +19,7 @@ class ListaDocumentosResponse(BaseModel):
     """DTO para listar todos los documentos."""
 
     total: int
-    documentos: List[Documento]
+    documentos: list[DocumentoResponse]
 
 
 class UploadResponse(BaseModel):
@@ -37,3 +42,17 @@ class ActualizarRequest(BaseModel):
     """DTO para request de actualizacion."""
 
     nuevo_nombre: str
+
+
+# Alias de compatibilidad para consumidores que importaban la entidad desde
+# este módulo. La entidad real ahora es un dataclass puro de dominio.
+Documento = DocumentoDominio
+
+__all__ = [
+    "ActualizarRequest",
+    "Documento",
+    "DocumentoResponse",
+    "ListaDocumentosResponse",
+    "MensajeResponse",
+    "UploadResponse",
+]

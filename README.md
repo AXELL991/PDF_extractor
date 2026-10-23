@@ -29,7 +29,7 @@ API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**.
 * [x] **API Gateway (Traefik):** Entrada unificada en puerto 80 con proxy inverso y dashboard.
 * [x] **Arquitectura Limpia & Casos de Uso:** Separación clara entre capas, endpoints, casos de uso y repositorios.
 * [x] **Manejo de Excepciones:** Excepciones personalizadas del dominio con códigos HTTP apropiados.
-* [x] **DTOs Tipados:** Respuestas de API con Pydantic para validación automática.
+* [x] **Dominio Puro y DTOs Tipados:** Entidad `Documento` como dataclass inmutable y esquemas Pydantic solo en la capa API.
 
 ---
 
@@ -47,15 +47,21 @@ API REST desarrollada para la cátedra de **Desarrollo de Software (UTN FRSR)**.
                                     │
                       ┌─────────────▼─────────────┐
                       │   FastAPI Application     │
+                      │  - create_app() factory   │
                       │  - Rutas y Middlewares    │
                       │  - ProcesarDocumentoUseCase│
-                      └───────┬─────────────┬─────┘
-                              │             │
-        ┌─────────────────────▼──┐       ┌──▼───────────────────┐
-        │  PyPDFExtractor        │       │  MongoRepository     │
-        │  (Extracción Markdown  │       │  (Persistencia en    │
-        │   y Hash SHA-256)      │       │   MongoDB)           │
-        └────────────────────────┘       └──────────────────────┘
+                      └───┬─────────┬─────────┬───┘
+                          │         │         │
+        ┌─────────────────▼──┐  ┌───▼───────┐ │
+        │  PyPDFExtractor    │  │ Checksum  │ │
+        │  (Extracción       │  │ Calculator│ │
+        │   Markdown)        │  │ (SHA-256) │ │
+        └────────────────────┘  └───────────┘ │
+                                  ┌───────────▼──────────┐
+                                  │  MongoRepository     │
+                                  │  (Persistencia en    │
+                                  │   MongoDB)           │
+                                  └──────────────────────┘
 ```
 
 ### 📚 Documentación de arquitectura

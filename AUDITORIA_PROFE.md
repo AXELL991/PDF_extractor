@@ -1,11 +1,15 @@
 # Informe de Auditoría — PDF Extractor UTN
 
+> **Nota (23/10/2026):** este documento corresponde a una verificación anterior y contiene referencias desactualizadas (77 tests, `is_safe_ip`, `SessionMiddleware`). La auditoría vigente, con el estado real de **78 tests** y los pendientes de TDD/YAGNI, está en [`AUDITORIA_FINAL.md`](AUDITORIA_FINAL.md).
+
 **Proyecto:** PDF Extractor API — UTN FRSR  
 **Fecha del informe:** 23/10/2026  
 **Actualización Fase 1:** 23/10/2026 — P0.1, P0.2 y P0.3 implementados y verificados.  
 **Actualización Fase 2:** 23/10/2026 — P0.4, P1.7, P1.8, P1.9 y P1.10 del plan implementados y verificados.  
 **Actualización Fase 3:** 23/10/2026 — P2.11, P2.12 y P2.13 del plan implementados; documentación de arquitectura y cierre final.
 **Actualización Fase 4:** 23/10/2026 — refactor YAGNI/SRP: se eliminaron `SessionMiddleware`, `itsdangerous`, `bandit`, `SESSION_SECRET_KEY`, la validación de IP y `generate_csrf_token` (renombrado a `generate_request_id`); `app/core/security.py` se dividió en un paquete cohesivo. Las referencias históricas de este informe describen el estado previo a esta fase.
+**Actualización Fase 5:** 23/10/2026 — cierre de testabilidad y Clean Architecture: `create_app()` como application factory, `Documento` como dataclass puro en `app/domain/entities.py`, separación de `ChecksumCalculator` y división de seguridad en `sanitization.py`/`pdf_validation.py`. Suite actual: **78 tests**; `ruff` limpio.
+
 **Auditor:** Revisión técnica integral (Arquitectura, Clean Code y TDD)  
 **Alcance:** `feedback_profe/analisis-arquitectura.md`, `feedback_profe/analisis-clean-code.md`, `feedback_profe/analisis-tdd.md`, código de `app/`, suite de `tests/`, `pyproject.toml`, `README.md` e historial Git.  
 **Método:** lectura completa de los 3 informes del profesor, inspección estática con referencias `archivo:línea`, ejecución de la suite y del linter, y verificación manual de casos límite.

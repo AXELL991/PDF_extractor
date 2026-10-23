@@ -8,7 +8,7 @@ import hashlib
 
 from fastapi.testclient import TestClient
 
-from app.dtos import Documento
+from app.domain.entities import Documento
 from tests.fakes import FakeRepo, build_test_app
 
 

@@ -24,17 +24,17 @@ La aplicación sigue una separación inspirada en **Clean Architecture**, con de
 dirigidas hacia el dominio y la capa de aplicación. La regla práctica es:
 
 > La presentación no conoce MongoDB ni `pypdf`; los casos de uso reciben colaboradores
-> inyectados (repositorio y extractor) que los adaptadores concretos implementan y que
-> los tests sustituyen por fakes.
+> inyectados (repositorio, extractor y calculador de checksum) que los adaptadores
+> concretos implementan y que los tests sustituyen por fakes.
 
 ### 2.1 Capas
 
 | Capa | Responsabilidad | Archivos principales |
 |---|---|---|
-| **Dominio** | Entidades, DTOs y errores de negocio. No conoce FastAPI ni `pymongo`. | `app/dtos.py`, `app/exceptions.py` |
+| **Dominio** | Entidad pura `Documento` y errores de negocio. No conoce Pydantic, FastAPI ni `pymongo`. | `app/domain/entities.py`, `app/exceptions.py` |
 | **Casos de uso / aplicación** | Orquestan validaciones, reglas de existencia, checksum, duplicados, sanitización y persistencia. | `app/use_cases/procesar_documento.py`, `app/use_cases/gestionar_documentos.py` |
-| **Adaptadores de infraestructura** | Implementan la persistencia y la extracción real. | `app/database.py` (`MongoRepository`), `app/services/pdf_extractor.py` (`PyPDFExtractor`) |
-| **Presentación** | Rutas HTTP, dependencias de FastAPI, middlewares y mapeo de excepciones a códigos HTTP. | `app/main.py`, `app/api/routes.py`, `app/api/dependencies.py`, `app/core/` |
+| **Adaptadores de infraestructura** | Implementan la persistencia, la extracción y el cálculo de checksum. | `app/database.py` (`MongoRepository`), `app/services/pdf_extractor.py` (`PyPDFExtractor`), `app/services/checksum.py` (`ChecksumCalculator`) |
+| **Presentación** | Rutas HTTP, esquemas Pydantic, dependencias de FastAPI, middlewares y mapeo de excepciones a códigos HTTP. | `app/main.py`, `app/api/routes.py`, `app/api/dependencies.py`, `app/dtos.py`, `app/core/` |
 
 ### 2.2 Flujo de una subida (`POST /upload`)
 
@@ -43,16 +43,17 @@ Cliente
   │
   ▼
 FastAPI / route handler
-  │  Depends(get_repositorio), Depends(get_extractor)
+  │  Depends(get_repositorio), Depends(get_extractor),
+  │  Depends(get_checksum_calculator)
   ▼
 ProcesarDocumentoUseCase.execute(nombre, bytes)
   │
   ├─ 1. validar tamaño (MAX_FILE_SIZE_BYTES)
   ├─ 2. sanitizar y validar nombre .pdf
   ├─ 3. is_valid_pdf (magic number + pypdf)
-  ├─ 4. calculate_checksum (SHA-256)
+  ├─ 4. ChecksumCalculator.calculate (SHA-256)
   ├─ 5. obtener_por_checksum → rechazar duplicado
-  ├─ 6. extract → Markdown
+  ├─ 6. PyPDFExtractor.extract → Markdown
   ├─ 7. sanitize_text
   └─ 8. guardar_documento(Documento)
   │
@@ -74,8 +75,11 @@ Los cuatro casos de uso validan el checksum y traducen la ausencia de un documen
 
 ### 2.4 Composición y dependencias
 
-- `app/main.py` es el **composition root**: crea `MongoRepository` y `PyPDFExtractor`,
-  los publica en `app.state` y monta la app FastAPI.
+- `app/main.py` expone `create_app(repositorio=None, extractor=None)`, el
+  **application factory** que construye la app FastAPI e inyecta explícitamente sus
+  dependencias. La instancia de producción es `app = create_app()`.
+- `create_app` publica `repositorio`, `extractor` y `checksum_calculator` en
+  `app.state`; los tests llaman a la misma factory con `FakeRepo`.
 - `app/api/dependencies.py` construye los casos de uso por request con `Depends()`.
 - No hay singleton global de base de datos dentro de las rutas ni mutación de casos de uso.
 
@@ -85,10 +89,11 @@ Los cuatro casos de uso validan el checksum y traducen la ausencia de un documen
 
 | Término | Significado |
 |---|---|
-| **Documento** | Entidad persistida con `archivo`, `texto` y `hash_seguridad`. |
+| **Documento** | Entidad pura (`@dataclass(frozen=True)`) con `archivo`, `texto` y `hash_seguridad`. |
 | **ProcesarDocumento** | Caso de uso que valida, extrae, sanitiza y persiste un PDF. |
 | **RepositorioDocumentos** | Contrato de persistencia implementado por `MongoRepository` y por `FakeRepo` en tests. |
-| **ExtractorPDF** | Contrato de extracción/checksum implementado por `PyPDFExtractor` y `FakeExtractor`. |
+| **ExtractorPDF** | Adaptador de extracción implementado por `PyPDFExtractor` y `FakeExtractor`. |
+| **CalculadorChecksum** | Adaptador de hash implementado por `ChecksumCalculator` y `FakeChecksumCalculator`. |
 | **Checksum** | SHA-256 del contenido binario; identifica unívocamente un documento y evita duplicados. |
 | **Seam** | Punto de sustitución donde se puede cambiar un adaptador sin modificar el llamador. |
 | **Texto vacío** | Texto de reemplazo cuando el PDF no produce contenido extraíble. |
@@ -101,10 +106,11 @@ Los seams son los puntos donde los tests sustituyen infraestructura por fakes:
 
 | Seam | Interfaz / punto de entrada | Adaptador real | Adaptador de test |
 |---|---|---|---|
-| Caso de uso de upload | `ProcesarDocumentoUseCase.execute(filename, content_bytes, file_size=None)` | `PyPDFExtractor` + `MongoRepository` | `FakeExtractor` + `FakeRepo` |
+| Caso de uso de upload | `ProcesarDocumentoUseCase.execute(filename, content_bytes, file_size=None)` | `PyPDFExtractor` + `ChecksumCalculator` + `MongoRepository` | `FakeExtractor` + `FakeChecksumCalculator` + `FakeRepo` |
 | Persistencia | `MongoRepository` (`obtener_por_checksum`, `guardar_documento`, `listar_todos`, `actualizar_nombre`, `eliminar_documento`, `ping`) | MongoDB / `pymongo` | `FakeRepo` en memoria |
-| Extracción | `PyPDFExtractor.calculate_checksum` y `extract` | `pypdf` + `hashlib` | `FakeExtractor` |
-| Presentación | `build_router()` y `TestClient` | FastAPI | `TestClient` con `app.state` fake |
+| Extracción | `PyPDFExtractor.extract` | `pypdf` | `FakeExtractor` |
+| Checksum | `ChecksumCalculator.calculate` | `hashlib` | `FakeChecksumCalculator` |
+| Presentación | `create_app()` y `TestClient` | FastAPI | `create_app(FakeRepo())` |
 | Errores de dominio | `DomainException` y subclases | handler HTTP | tests unitarios de excepciones |
 
 ### Regla de test
@@ -192,9 +198,9 @@ configuración antes de levantar los contenedores.
 
 ## 7. Estado de pruebas y TDD
 
-- Suite actual: **77 tests**, ejecutada con `uv run pytest -q`.
+- Suite actual: **78 tests**, ejecutada con `uv run pytest -q`.
 - Linter: `uv run ruff check .` sin observaciones.
-- Los tests unitarios usan `FakeRepo`/`FakeExtractor` y no tocan MongoDB ni archivos.
+- Los tests unitarios usan `FakeRepo`/`FakeExtractor`/`FakeChecksumCalculator` y no tocan MongoDB ni archivos.
 - Para cada nueva funcionalidad, el proceso acordado es: **test rojo → implementación
   mínima → test verde → refactor**, dejando evidencia en el historial de Git.
 

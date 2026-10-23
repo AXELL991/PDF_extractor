@@ -5,6 +5,7 @@ import io
 import pytest
 
 from app.exceptions import ExtractionError
+from app.services.checksum import ChecksumCalculator
 from app.services.pdf_extractor import PyPDFExtractor
 
 
@@ -64,10 +65,9 @@ def test_format_page_to_markdown():
 
 def test_calculate_checksum_returns_sha256():
     """Verifica que el hash sea SHA-256 de 64 caracteres."""
-    extractor = PyPDFExtractor()
-    content = io.BytesIO(b"contenido de prueba para hash")
+    calculador = ChecksumCalculator()
 
-    checksum = extractor.calculate_checksum(content)
+    checksum = calculador.calculate(b"contenido de prueba para hash")
 
     assert len(checksum) == 64
     assert isinstance(checksum, str)
@@ -76,24 +76,20 @@ def test_calculate_checksum_returns_sha256():
 
 def test_checksum_consistency():
     """Mismo contenido = mismo hash."""
-    extractor = PyPDFExtractor()
-    content1 = io.BytesIO(b"contenido consistente")
-    content2 = io.BytesIO(b"contenido consistente")
+    calculador = ChecksumCalculator()
 
-    hash1 = extractor.calculate_checksum(content1)
-    hash2 = extractor.calculate_checksum(content2)
+    hash1 = calculador.calculate(b"contenido consistente")
+    hash2 = calculador.calculate(b"contenido consistente")
 
     assert hash1 == hash2
 
 
 def test_checksum_different_content():
     """Contenido diferente = hash diferente."""
-    extractor = PyPDFExtractor()
-    content1 = io.BytesIO(b"contenido A")
-    content2 = io.BytesIO(b"contenido B")
+    calculador = ChecksumCalculator()
 
-    hash1 = extractor.calculate_checksum(content1)
-    hash2 = extractor.calculate_checksum(content2)
+    hash1 = calculador.calculate(b"contenido A")
+    hash2 = calculador.calculate(b"contenido B")
 
     assert hash1 != hash2
 
@@ -102,15 +98,14 @@ def test_calculate_checksum_matches_literal():
     """El checksum calculado debe coincidir con el hash SHA-256 pre-calculado.
     Esto evita depender de la misma lógica de `hashlib` dentro del propio test.
     """
-    extractor = PyPDFExtractor()
+    calculador = ChecksumCalculator()
     # Contenido idéntico al usado para generar el hash literal
     data = b"datos de prueba para verificar"
-    content = io.BytesIO(data)
 
     # Hash SHA-256 generado previamente con `hashlib.sha256(data).hexdigest()`
     expected_literal = (
         "3031af382c85802ddb5f99e73602bf7cef3379374d2dfe5ba1738df3a2c46f5b"
     )
-    actual = extractor.calculate_checksum(content)
+    actual = calculador.calculate(data)
 
     assert actual == expected_literal

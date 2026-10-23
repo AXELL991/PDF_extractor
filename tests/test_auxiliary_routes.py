@@ -10,8 +10,8 @@ def client_for(repositorio: FakeRepo) -> TestClient:
 
 
 class TestRootEndpoint:
-    def test_root_responde_200(self):
-        response = client_for(FakeRepo()).get("/")
+    def test_root_responde_200(self, client):
+        response = client.get("/")
 
         assert response.status_code == 200
         assert response.json()["status"] == "online"
@@ -19,15 +19,13 @@ class TestRootEndpoint:
 
 
 class TestHealthEndpoint:
-    def test_health_200_cuando_ping_funciona(self):
-        repo = FakeRepo()
-
-        response = client_for(repo).get("/health")
+    def test_health_200_cuando_ping_funciona(self, client, fake_repo):
+        response = client.get("/health")
 
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
         assert response.json()["database"] == "connected"
-        assert repo.llamadas == [("ping",)]
+        assert fake_repo.llamadas == [("ping",)]
 
     def test_health_503_cuando_ping_falla(self):
         repo = FakeRepo(ping_error=RuntimeError("Mongo no disponible"))
@@ -41,8 +39,8 @@ class TestHealthEndpoint:
 
 
 class TestSecurityTxt:
-    def test_security_txt_responde_texto_plano(self):
-        response = client_for(FakeRepo()).get("/security.txt")
+    def test_security_txt_responde_texto_plano(self, client):
+        response = client.get("/security.txt")
 
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/plain")

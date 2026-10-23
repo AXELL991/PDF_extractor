@@ -3,12 +3,14 @@
 import os
 
 import pytest
+from fastapi.testclient import TestClient
 
 # La configuración debe leerse antes de importar `app.main` o `app.core.config`.
 # En tests usamos desarrollo para no depender del entorno del host.
 os.environ.setdefault("ENVIRONMENT", "development")
 
 from app.core.rate_limit import limiter  # noqa: E402
+from tests.fakes import FakeRepo, build_test_app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -17,6 +19,18 @@ def desactivar_rate_limiting():
     limiter.enabled = False
     yield
     limiter.enabled = True
+
+
+@pytest.fixture
+def fake_repo() -> FakeRepo:
+    """Repositorio en memoria para tests HTTP que no necesitan datos previos."""
+    return FakeRepo()
+
+
+@pytest.fixture
+def client(fake_repo: FakeRepo) -> TestClient:
+    """Cliente HTTP construido con la factory y el FakeRepo inyectado."""
+    return TestClient(build_test_app(fake_repo), base_url="http://localhost")
 
 
 def crear_pdf_con_texto(texto: str = "Hola PDF de prueba") -> bytes:

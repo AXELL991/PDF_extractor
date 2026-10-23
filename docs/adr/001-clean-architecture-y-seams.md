@@ -40,10 +40,10 @@ Se adopta la siguiente arquitectura y estrategia de pruebas.
 
 | Capa | Contenido | Regla |
 |---|---|---|
-| **Dominio** | `Documento`, DTOs y excepciones de negocio. | No importa FastAPI, MongoDB ni `pypdf`. |
+| **Dominio** | `Documento` (`@dataclass(frozen=True)`) y excepciones de negocio. | No importa Pydantic, FastAPI, MongoDB ni `pypdf`. |
 | **Aplicación / casos de uso** | `ProcesarDocumentoUseCase` y los cuatro casos de uso CRUD. | Orquestan reglas y dependen de colaboradores inyectados. |
-| **Infraestructura** | `MongoRepository`, `PyPDFExtractor`, configuración y seguridad. | Implementan detalles reemplazables. |
-| **Presentación** | `app/main.py`, rutas, dependencias, middlewares y handlers. | Traducen HTTP ↔ casos de uso; no contienen reglas de negocio. |
+| **Infraestructura** | `MongoRepository`, `PyPDFExtractor`, `ChecksumCalculator`, configuración y seguridad. | Implementan detalles reemplazables. |
+| **Presentación** | `create_app`, rutas, esquemas Pydantic, dependencias, middlewares y handlers. | Traducen HTTP ↔ casos de uso; no contienen reglas de negocio. |
 
 La dirección de dependencias va desde presentación/infraestructura hacia aplicación y
 dominio. La presentación no importa `pymongo` ni usa `pypdf` directamente.
@@ -57,7 +57,7 @@ ProcesarDocumentoUseCase.execute(
     filename: str,
     content_bytes: bytes,
     file_size: int | None = None,
-) -> UploadResponse
+) -> ResultadoDocumento
 ```
 
 El caso de uso concentra, en orden:
@@ -76,12 +76,19 @@ y la existencia del documento, y delegan la persistencia en el repositorio.
 
 ### 2.3 Inyección de dependencias
 
-`app/main.py` actúa como **composition root**:
+`app/main.py` expone el **application factory**:
 
-- crea `MongoRepository` y `PyPDFExtractor`;
-- los publica en `app.state`;
-- `app/api/dependencies.py` los obtiene con `Depends()` y construye los casos de uso
-  por request.
+```python
+create_app(repositorio=None, extractor=None) -> FastAPI
+```
+
+- construye la app FastAPI y configura middlewares, handlers y router;
+- inyecta `MongoRepository`, `PyPDFExtractor` y `ChecksumCalculator`;
+- publica las dependencias en `app.state`;
+- `app/api/dependencies.py` las obtiene con `Depends()` y construye los casos de uso
+  por request;
+- la instancia de producción es `app = create_app()`;
+- los tests llaman a la misma factory con `FakeRepo`, sin parchear la app global.
 
 No se usa un singleton global de base de datos dentro de las rutas ni se mutan
 instancias compartidas de casos de uso. Esto permite sustituir los adaptadores sin
@@ -96,11 +103,12 @@ El fake:
 - implementa `obtener_por_checksum`, `guardar_documento`, `listar_todos`,
   `actualizar_nombre`, `eliminar_documento` y `ping`;
 - registra el orden de las llamadas y permite verificar efectos secundarios;
-- se complementa con `FakeExtractor`, que permite controlar checksum y texto extraído.
+- se complementa con `FakeExtractor` para el texto extraído y
+  `FakeChecksumCalculator` para el hash.
 
 Los tests unitarios cruzan el seam del caso de uso con estos fakes, sin HTTP, sin
-MongoDB y sin archivos. Los tests de contrato HTTP usan `TestClient` y publican el fake
-en `app.state.repositorio`, que es el mismo seam que usa el composition root.
+MongoDB y sin archivos. Los tests de contrato HTTP usan `TestClient` y construyen la
+app con `create_app(FakeRepo())`, el mismo seam que usa el composition root.
 
 ### 2.5 Configuración centralizada
 
@@ -115,10 +123,10 @@ una única fuente: `MAX_FILE_SIZE_MB` / `MAX_FILE_SIZE_BYTES`.
   que justifique un puerto formal. Se aplica YAGNI/OCP diferido. Si aparece otro motor
   de base de datos u otro extractor, se introduce el `Protocol` y se ajusta la
   inyección.
-- **`MongoRepository.__init__` crea el cliente.** `MongoClient` es lazy y el composition
-  root es el lugar previsto para construir el adaptador. Si se busca DIP estricto o se
-  necesita testear el adaptador con un cliente inyectado, se moverá a una factory o a
-  `lifespan`.
+- **`MongoRepository.__init__` crea el cliente.** `MongoClient` es lazy y
+  `create_app` es el lugar previsto para construir el adaptador. Si se busca DIP
+  estricto para el driver o se necesita testear el adaptador con un cliente inyectado,
+  se moverá la creación del cliente a `lifespan` o a una factory específica.
 ---
 
 ## 3. Consecuencias
@@ -177,11 +185,13 @@ una única fuente: `MAX_FILE_SIZE_MB` / `MAX_FILE_SIZE_BYTES`.
 
 ## 5. Verificación
 
-- `uv run pytest -q` → **77 tests en verde**.
+- `uv run pytest -q` → **78 tests en verde**.
 - `uv run ruff check .` → **All checks passed!**
+- `tests/test_app_factory.py` verifica la inyección explícita de repositorio y extractor.
 - `tests/test_use_cases.py` verifica el seam de aplicación y los casos borde.
 - `tests/test_crud.py` verifica el contrato HTTP con `FakeRepo`.
-- `tests/test_auxiliary_routes.py` cubre `/`, `/health` y `/security.txt`.
+- `tests/test_auxiliary_routes.py` cubre `/`, `/health` y `/security.txt` con la
+  factory y la fixture `client`.
 - `tests/test_config.py` cubre la configuración centralizada y el fail-fast de
   producción.
 
@@ -190,10 +200,14 @@ una única fuente: `MAX_FILE_SIZE_MB` / `MAX_FILE_SIZE_BYTES`.
 ## 6. Referencias
 
 - `CONTEXT.md` — mapa de arquitectura, glosario, seams y guía de ejecución.
+- `app/domain/entities.py` — entidad pura `Documento`.
 - `app/use_cases/procesar_documento.py` — caso de uso de upload.
 - `app/use_cases/gestionar_documentos.py` — casos de uso CRUD.
+- `app/main.py` — `create_app()` y composition root.
 - `app/api/dependencies.py` — inyección con `Depends()`.
 - `app/database.py` — adaptador MongoDB.
 - `app/services/pdf_extractor.py` — adaptador de extracción.
-- `tests/fakes.py` — `FakeRepo` y `FakeExtractor`.
+- `app/services/checksum.py` — adaptador de checksum.
+- `app/core/security/sanitization.py` y `pdf_validation.py` — seguridad separada.
+- `tests/fakes.py` — `FakeRepo`, `FakeExtractor` y `FakeChecksumCalculator`.
 - `AUDITORIA_PROFE.md` — estado final y trazabilidad de hallazgos.

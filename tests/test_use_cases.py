@@ -5,7 +5,7 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from app.core.config import MAX_FILE_SIZE_BYTES
-from app.dtos import Documento
+from app.domain.entities import Documento
 from app.exceptions import (
     ChecksumInvalidoError,
     DocumentoDuplicadoError,
@@ -25,7 +25,7 @@ from app.use_cases.procesar_documento import (
     ProcesarDocumentoUseCase,
     ResultadoDocumento,
 )
-from tests.fakes import FakeExtractor, FakeRepo
+from tests.fakes import FakeChecksumCalculator, FakeExtractor, FakeRepo
 
 
 CHECKSUM = "a" * 64
@@ -52,14 +52,22 @@ def test_resultado_documento_igualdad_por_valor():
 class TestProcesarDocumentoUseCase:
     """Verifica la orquestación completa del upload y sus efectos secundarios."""
 
-    def test_exito_registra_orden_y_persiste(self, pdf_con_texto):
-        repo = FakeRepo()
-        extractor = FakeExtractor(
-            checksum=CHECKSUM,
-            texto="Hola PDF",
+    def _use_case(self, repo, extractor=None, checksum=CHECKSUM):
+        extractor = extractor or FakeExtractor(llamadas=repo.llamadas)
+        calculador = FakeChecksumCalculator(
+            checksum=checksum,
             llamadas=repo.llamadas,
         )
-        use_case = ProcesarDocumentoUseCase(extractor=extractor, db=repo)
+        return ProcesarDocumentoUseCase(
+            extractor=extractor,
+            db=repo,
+            checksum_calculator=calculador,
+        )
+
+    def test_exito_registra_orden_y_persiste(self, pdf_con_texto):
+        repo = FakeRepo()
+        extractor = FakeExtractor(texto="Hola PDF", llamadas=repo.llamadas)
+        use_case = self._use_case(repo, extractor)
 
         respuesta = use_case.execute("test.pdf", pdf_con_texto)
 
@@ -81,11 +89,10 @@ class TestProcesarDocumentoUseCase:
     def test_sanitiza_texto_extraido(self, pdf_con_texto):
         repo = FakeRepo()
         extractor = FakeExtractor(
-            checksum=CHECKSUM,
             texto="<script>alert('xss')</script>Hola <b>mundo</b>",
             llamadas=repo.llamadas,
         )
-        use_case = ProcesarDocumentoUseCase(extractor=extractor, db=repo)
+        use_case = self._use_case(repo, extractor)
 
         use_case.execute("test.pdf", pdf_con_texto)
 
@@ -97,8 +104,8 @@ class TestProcesarDocumentoUseCase:
 
     def test_pdf_sin_texto_persiste_constante(self, pdf_con_texto):
         repo = FakeRepo()
-        extractor = FakeExtractor(checksum=CHECKSUM, texto="")
-        use_case = ProcesarDocumentoUseCase(extractor=extractor, db=repo)
+        extractor = FakeExtractor(texto="", llamadas=repo.llamadas)
+        use_case = self._use_case(repo, extractor)
 
         use_case.execute("test.pdf", pdf_con_texto)
 
@@ -107,14 +114,11 @@ class TestProcesarDocumentoUseCase:
 
     def test_error_de_extraccion_no_persiste(self, pdf_con_texto):
         class ExtractorRoto:
-            def calculate_checksum(self, file_stream) -> str:
-                return CHECKSUM
-
             def extract(self, file_stream) -> str:
                 raise ExtractionError()
 
         repo = FakeRepo()
-        use_case = ProcesarDocumentoUseCase(extractor=ExtractorRoto(), db=repo)
+        use_case = self._use_case(repo, ExtractorRoto())
 
         with pytest.raises(ExtractionError):
             use_case.execute("test.pdf", pdf_con_texto)
@@ -123,8 +127,7 @@ class TestProcesarDocumentoUseCase:
 
     def test_duplicado_no_extrae_ni_guarda(self, pdf_con_texto):
         repo = FakeRepo([documento(checksum=CHECKSUM)])
-        extractor = FakeExtractor(checksum=CHECKSUM, llamadas=repo.llamadas)
-        use_case = ProcesarDocumentoUseCase(extractor=extractor, db=repo)
+        use_case = self._use_case(repo)
 
         with pytest.raises(DocumentoDuplicadoError):
             use_case.execute("test.pdf", pdf_con_texto)
@@ -138,7 +141,7 @@ class TestProcesarDocumentoUseCase:
     def test_archivo_excedido_no_toca_dependencias(self, pdf_con_texto):
         repo = FakeRepo()
         extractor = FakeExtractor(llamadas=repo.llamadas)
-        use_case = ProcesarDocumentoUseCase(extractor=extractor, db=repo)
+        use_case = self._use_case(repo, extractor)
 
         with pytest.raises(TamañoExcedidoError):
             use_case.execute(
@@ -154,7 +157,7 @@ class TestProcesarDocumentoUseCase:
     def test_pdf_corrupto_no_toca_dependencias(self):
         repo = FakeRepo()
         extractor = FakeExtractor(llamadas=repo.llamadas)
-        use_case = ProcesarDocumentoUseCase(extractor=extractor, db=repo)
+        use_case = self._use_case(repo, extractor)
 
         with pytest.raises(FormatoInvalidoError):
             use_case.execute("test.pdf", b"%PDF-1.4 contenido corrupto")
@@ -166,7 +169,7 @@ class TestProcesarDocumentoUseCase:
     def test_nombre_invalido_no_toca_dependencias(self, pdf_con_texto):
         repo = FakeRepo()
         extractor = FakeExtractor(llamadas=repo.llamadas)
-        use_case = ProcesarDocumentoUseCase(extractor=extractor, db=repo)
+        use_case = self._use_case(repo, extractor)
 
         with pytest.raises(NombreArchivoInvalidoError):
             use_case.execute("test.txt", pdf_con_texto)

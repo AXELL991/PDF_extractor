@@ -23,7 +23,7 @@ from app.core.rate_limit import limiter
 from app.database import MongoRepository
 from app.dtos import (
     ActualizarRequest,
-    Documento,
+    DocumentoResponse,
     ListaDocumentosResponse,
     MensajeResponse,
     UploadResponse,
@@ -152,22 +152,28 @@ def build_router() -> APIRouter:
         """Devuelve una lista con todos los documentos procesados hasta ahora."""
         documentos = use_case.execute()
         logger.info(f"Listados {len(documentos)} documentos")
-        return ListaDocumentosResponse(total=len(documentos), documentos=documentos)
+        return ListaDocumentosResponse(
+            total=len(documentos),
+            documentos=[
+                DocumentoResponse.model_validate(documento) for documento in documentos
+            ],
+        )
 
     @router.get(
         "/documentos/{checksum}",
         tags=["Documentos (CRUD)"],
         summary="2. Leer: Buscar por Hash",
-        response_model=Documento,
+        response_model=DocumentoResponse,
     )
     @limiter.limit("60/minute")
     async def obtener_documento(
         checksum: str,
         request: Request,
         use_case: ObtenerDocumentoUseCase = Depends(get_obtener_documento_use_case),
-    ) -> Documento:
+    ) -> DocumentoResponse:
         """Busca un documento específico utilizando su hash SHA-256."""
-        return use_case.execute(checksum)
+        documento = use_case.execute(checksum)
+        return DocumentoResponse.model_validate(documento)
 
     @router.put(
         "/documentos/{checksum}",

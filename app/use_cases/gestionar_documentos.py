@@ -7,7 +7,7 @@ petición y la respuesta.
 
 from app.core.security import sanitize_filename, validate_checksum
 from app.database import MongoRepository
-from app.dtos import Documento
+from app.domain.entities import Documento
 from app.exceptions import (
     ChecksumInvalidoError,
     DocumentoNoEncontradoError,

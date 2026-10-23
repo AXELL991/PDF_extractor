@@ -1,7 +1,7 @@
-import hashlib
 import io
 import logging
 import re
+
 from pypdf import PdfReader
 
 from app.exceptions import ExtractionError
@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 class PyPDFExtractor:
-    """Clase encargada de la lógica de negocio: extraer contenido en Markdown y generar hash."""
+    """Adaptador de extracción: convierte el contenido de un PDF a Markdown."""
 
     def extract(self, file_stream: io.BytesIO) -> str:
-        """Recibe un flujo de bytes en RAM y devuelve el contenido del PDF formateado en Markdown."""
+        """Recibe un flujo de bytes en RAM y devuelve el contenido en Markdown."""
         try:
             reader = PdfReader(file_stream)
             markdown_pages = []
@@ -50,9 +50,3 @@ class PyPDFExtractor:
                 formatted_lines.append(line)
 
         return "\n\n".join(formatted_lines)
-
-    def calculate_checksum(self, file_stream: io.BytesIO) -> str:
-        """Genera un hash SHA-256 único del contenido del archivo."""
-        file_stream.seek(0)
-        file_bytes = file_stream.read()
-        return hashlib.sha256(file_bytes).hexdigest()
