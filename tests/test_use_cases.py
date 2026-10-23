@@ -1,5 +1,7 @@
 """Tests unitarios directos de los casos de uso, sin infraestructura HTTP."""
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from app.core.config import MAX_FILE_SIZE_BYTES
@@ -8,6 +10,7 @@ from app.exceptions import (
     ChecksumInvalidoError,
     DocumentoDuplicadoError,
     DocumentoNoEncontradoError,
+    ExtractionError,
     FormatoInvalidoError,
     NombreArchivoInvalidoError,
     TamañoExcedidoError,
@@ -18,7 +21,10 @@ from app.use_cases.gestionar_documentos import (
     ListarDocumentosUseCase,
     ObtenerDocumentoUseCase,
 )
-from app.use_cases.procesar_documento import ProcesarDocumentoUseCase
+from app.use_cases.procesar_documento import (
+    ProcesarDocumentoUseCase,
+    ResultadoDocumento,
+)
 from tests.fakes import FakeExtractor, FakeRepo
 
 
@@ -28,6 +34,19 @@ OTRO_CHECKSUM = "b" * 64
 
 def documento(archivo: str = "documento.pdf", checksum: str = CHECKSUM) -> Documento:
     return Documento(archivo=archivo, texto="contenido", hash_seguridad=checksum)
+
+
+def test_resultado_documento_es_inmutable():
+    resultado = ResultadoDocumento(filename="test.pdf", sha256=CHECKSUM)
+
+    with pytest.raises(FrozenInstanceError):
+        resultado.filename = "otro.pdf"
+
+
+def test_resultado_documento_igualdad_por_valor():
+    assert ResultadoDocumento("test.pdf", CHECKSUM) == ResultadoDocumento(
+        "test.pdf", CHECKSUM
+    )
 
 
 class TestProcesarDocumentoUseCase:
@@ -44,6 +63,7 @@ class TestProcesarDocumentoUseCase:
 
         respuesta = use_case.execute("test.pdf", pdf_con_texto)
 
+        assert isinstance(respuesta, ResultadoDocumento)
         assert respuesta.sha256 == CHECKSUM
         assert respuesta.filename == "test.pdf"
         assert repo.guardado == Documento(
@@ -74,6 +94,32 @@ class TestProcesarDocumentoUseCase:
         assert "<b>" not in repo.guardado.texto
         assert "Hola" in repo.guardado.texto
         assert "mundo" in repo.guardado.texto
+
+    def test_pdf_sin_texto_persiste_constante(self, pdf_con_texto):
+        repo = FakeRepo()
+        extractor = FakeExtractor(checksum=CHECKSUM, texto="")
+        use_case = ProcesarDocumentoUseCase(extractor=extractor, db=repo)
+
+        use_case.execute("test.pdf", pdf_con_texto)
+
+        assert repo.guardado is not None
+        assert repo.guardado.texto == "Vacio"
+
+    def test_error_de_extraccion_no_persiste(self, pdf_con_texto):
+        class ExtractorRoto:
+            def calculate_checksum(self, file_stream) -> str:
+                return CHECKSUM
+
+            def extract(self, file_stream) -> str:
+                raise ExtractionError()
+
+        repo = FakeRepo()
+        use_case = ProcesarDocumentoUseCase(extractor=ExtractorRoto(), db=repo)
+
+        with pytest.raises(ExtractionError):
+            use_case.execute("test.pdf", pdf_con_texto)
+
+        assert repo.guardado is None
 
     def test_duplicado_no_extrae_ni_guarda(self, pdf_con_texto):
         repo = FakeRepo([documento(checksum=CHECKSUM)])

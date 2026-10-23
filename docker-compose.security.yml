@@ -22,8 +22,6 @@ services:
       - LOGLEVEL=INFO
       - MAX_FILE_SIZE_MB=5
       - ALLOWED_ORIGINS=https://pdf-extractor.utn.edu.ar
-      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
-      - ENFORCE_IP_VALIDATION=false
       - FASTAPI_DEBUG=false
       # MongoDB connection (use secrets in production)
       - MONGO_URI=${MONGO_URI}

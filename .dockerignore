@@ -106,7 +106,6 @@ secrets/
 .pytype
 
 # Archivos de análisis estático
-.bandit
 .safety
 
 # Node modules (si aplica)

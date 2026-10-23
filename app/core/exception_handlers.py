@@ -10,7 +10,9 @@ from app.exceptions import DomainException
 logger = logging.getLogger(__name__)
 
 
-async def domain_exception_handler(request: Request, exc: DomainException) -> JSONResponse:
+async def domain_exception_handler(
+    request: Request, exc: DomainException
+) -> JSONResponse:
     """Maneja todas las excepciones del dominio de forma uniforme y segura."""
     client_ip = request.client.host if request.client else "unknown"
     logger.warning(

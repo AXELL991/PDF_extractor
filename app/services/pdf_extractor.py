@@ -4,6 +4,8 @@ import logging
 import re
 from pypdf import PdfReader
 
+from app.exceptions import ExtractionError
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,9 +25,9 @@ class PyPDFExtractor:
                     markdown_pages.append(page_markdown)
 
             return "\n\n---\n\n".join(markdown_pages).strip()
-        except Exception as e:
-            logger.error(f"Error en la extracción a Markdown: {e}", exc_info=True)
-            return ""
+        except Exception as exc:
+            logger.error(f"Error en la extracción a Markdown: {exc}", exc_info=True)
+            raise ExtractionError() from exc
 
     def _format_page_to_markdown(self, text: str, page_number: int) -> str:
         """Convierte el texto de una página a estructura Markdown limpia."""

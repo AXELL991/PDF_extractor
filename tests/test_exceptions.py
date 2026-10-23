@@ -1,11 +1,13 @@
 """Tests para excepciones personalizadas."""
+
 from app.core.config import MAX_FILE_SIZE_MB
 from app.exceptions import (
+    DocumentoDuplicadoError,
+    DocumentoNoEncontradoError,
     DomainException,
+    ExtractionError,
     FormatoInvalidoError,
     TamañoExcedidoError,
-    DocumentoDuplicadoError,
-    DocumentoNoEncontradoError
 )
 
 
@@ -55,3 +57,11 @@ def test_documento_no_encontrado_error():
 
     assert exc.status_code == 404
     assert "no encontrado" in exc.message.lower()
+
+
+def test_extraction_error_devuelve_422():
+    """Un fallo de extracción se reporta como error de dominio 422."""
+    exc = ExtractionError()
+
+    assert exc.status_code == 422
+    assert "extraer" in exc.message.lower()

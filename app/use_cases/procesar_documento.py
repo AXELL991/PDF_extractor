@@ -1,11 +1,12 @@
 """Caso de uso para procesar y persistir documentos PDF."""
 
 import io
+from dataclasses import dataclass
 
 from app.core.config import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
 from app.core.security import is_valid_pdf, sanitize_filename, sanitize_text
 from app.database import MongoRepository
-from app.dtos import Documento, UploadResponse
+from app.dtos import Documento
 from app.exceptions import (
     DocumentoDuplicadoError,
     FormatoInvalidoError,
@@ -19,7 +20,17 @@ from app.services.pdf_extractor import PyPDFExtractor
 TEXTO_VACIO = "Vacio"
 
 
-def validar_tamano_archivo(file_size: int | None, content_bytes: bytes | None = None) -> None:
+@dataclass(frozen=True)
+class ResultadoDocumento:
+    """Resultado de dominio del procesamiento de un PDF."""
+
+    filename: str
+    sha256: str
+
+
+def validar_tamano_archivo(
+    file_size: int | None, content_bytes: bytes | None = None
+) -> None:
     """Valida que el tamaño del archivo no exceda el límite permitido.
 
     Única regla centralizada de validación de tamaño.
@@ -46,7 +57,7 @@ class ProcesarDocumentoUseCase:
         filename: str,
         content_bytes: bytes,
         file_size: int | None = None,
-    ) -> UploadResponse:
+    ) -> ResultadoDocumento:
         """Valida el PDF, extrae su texto y lo guarda en la base de datos."""
         validar_tamano_archivo(file_size, content_bytes)
         nombre_sanitizado = self._sanitizar_nombre(filename)
@@ -70,9 +81,7 @@ class ProcesarDocumentoUseCase:
             )
         )
 
-        return UploadResponse(
-            status="success",
-            message="Documento procesado y guardado correctamente.",
+        return ResultadoDocumento(
             filename=nombre_sanitizado,
             sha256=checksum,
         )

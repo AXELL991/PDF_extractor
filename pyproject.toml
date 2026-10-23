@@ -13,7 +13,6 @@ dependencies = [
     "python-multipart>=0.0.27",  # Requerido por FastAPI para el upload multipart
     "slowapi>=0.1.9",            # Rate limiting para protección contra DoS
     "bleach>=6.1.0",             # Sanitización de HTML/inputs
-    "itsdangerous>=2.1.0",       # Requisito de SessionMiddleware (Starlette)
 ]
 
 [tool.pytest.ini_options]
@@ -27,5 +26,4 @@ dev = [
     "httpx>=0.28.1",            # Requerido por TestClient de Starlette
     "pytest>=9.0.3",
     "ruff>=0.3.0",              # Linter y formateador de código (KISS / DRY)
-    "bandit[toml]>=1.7.0",      # Análisis estático de seguridad
 ]

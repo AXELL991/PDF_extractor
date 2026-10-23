@@ -105,9 +105,8 @@ en `app.state.repositorio`, que es el mismo seam que usa el composition root.
 ### 2.5 Configuración centralizada
 
 Toda la configuración de entorno se centraliza en `app/core/config.py`. `app/main.py`
-valida al arrancar y falla rápido si `ENVIRONMENT=production` y falta
-`SESSION_SECRET_KEY`. El límite de tamaño tiene una única fuente:
-`MAX_FILE_SIZE_MB` / `MAX_FILE_SIZE_BYTES`.
+valida al arrancar y falla rápido si el límite de tamaño no es válido. El límite tiene
+una única fuente: `MAX_FILE_SIZE_MB` / `MAX_FILE_SIZE_BYTES`.
 
 ### 2.6 Decisiones diferidas y límites conscientes
 
@@ -116,19 +115,10 @@ valida al arrancar y falla rápido si `ENVIRONMENT=production` y falta
   que justifique un puerto formal. Se aplica YAGNI/OCP diferido. Si aparece otro motor
   de base de datos u otro extractor, se introduce el `Protocol` y se ajusta la
   inyección.
-- **`SessionMiddleware`/`itsdangerous` se mantiene** como parte del stack de seguridad
-  y para una futura funcionalidad de sesión/CSRF. No hay endpoints que usen
-  `request.session` hoy; se acepta como deuda de limpieza no bloqueante y se reevaluará
-  si no aparece esa funcionalidad.
 - **`MongoRepository.__init__` crea el cliente.** `MongoClient` es lazy y el composition
   root es el lugar previsto para construir el adaptador. Si se busca DIP estricto o se
   necesita testear el adaptador con un cliente inyectado, se moverá a una factory o a
   `lifespan`.
-- **La validación de IP es opt-in.** Detrás de Traefik, `request.client.host` puede ser
-  la IP del proxy. No se confía ciegamente en `X-Forwarded-For`; la feature queda
-  desactivada por defecto y documentada para despliegues directos o con proxies
-  confiables explícitamente configurados.
-
 ---
 
 ## 3. Consecuencias
@@ -157,15 +147,11 @@ valida al arrancar y falla rápido si `ENVIRONMENT=production` y falta
 - El `FakeRepo` debe mantenerse sincronizado con el contrato de `MongoRepository`.
 - La suite unitaria no reemplaza una prueba de integración contra MongoDB real; esa
   verificación queda fuera del alcance de la suite rápida.
-- La validación de IP no protege por sí sola detrás de un proxy; requiere configuración
-  explícita de proxies confiables.
 
 ### 3.3 Neutrales
 
-- `SessionMiddleware` y `itsdangerous` permanecen en el stack aunque hoy no haya
-  sesiones de usuario; es una decisión consciente y reversible.
-- El string de texto vacío puede evolucionar a una constante o a un estado explícito en
-  una limpieza posterior, sin afectar los seams.
+- El texto vacío se representa con la constante `TEXTO_VACIO` en la capa de aplicación;
+  puede evolucionar a un estado explícito sin afectar los seams.
 
 ---
 

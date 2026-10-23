@@ -8,7 +8,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes import build_router
@@ -17,7 +16,7 @@ from app.core.config import (
     ALLOWED_ORIGINS,
     ENVIRONMENT,
     LOG_LEVEL,
-    get_session_secret_key,
+    validate_config,
 )
 from app.core.exception_handlers import domain_exception_handler
 from app.core.logging_config import setup_logging
@@ -29,8 +28,8 @@ from app.services.pdf_extractor import PyPDFExtractor
 
 setup_logging(log_level=LOG_LEVEL, environment=ENVIRONMENT)
 
-# Fallar rápido si la configuración de producción está incompleta.
-session_secret_key = get_session_secret_key()
+# Fallar rápido si la configuración es inválida.
+validate_config()
 
 db = MongoRepository()
 extractor = PyPDFExtractor()
@@ -64,14 +63,6 @@ app.add_middleware(
 )
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=session_secret_key,
-    session_cookie="session_id",
-    max_age=1800,
-    same_site="lax",
-    https_only=ENVIRONMENT == "production",
-)
 app.add_middleware(BaseHTTPMiddleware, dispatch=security_middleware)
 
 # Dependencias publicadas para los proveedores de `app.api.dependencies`.

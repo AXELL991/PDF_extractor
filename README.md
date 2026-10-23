@@ -83,9 +83,8 @@ cp .env.example .env
 uv sync
 ```
 
-> En producción (`ENVIRONMENT=production`) `SESSION_SECRET_KEY` es obligatoria.
-> La aplicación falla rápido al iniciar si no está definida. Toda la configuración
-> de entorno se centraliza en `app/core/config.py`.
+> Toda la configuración de entorno se centraliza en `app/core/config.py` y se valida
+> al iniciar. El límite de tamaño se controla con `MAX_FILE_SIZE_MB`.
 
 ### 3. Levantar Todo con Docker Compose (Traefik + Mongo + API)
 

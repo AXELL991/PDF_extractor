@@ -1,5 +1,10 @@
 """Tests completos para el extractor de PDF a Markdown."""
+
 import io
+
+import pytest
+
+from app.exceptions import ExtractionError
 from app.services.pdf_extractor import PyPDFExtractor
 
 
@@ -12,10 +17,43 @@ def test_extract_text_from_pdf(pdf_con_texto):
     assert "## Página 1" in resultado
 
 
+def test_extract_lanza_error_ante_fallo_de_lectura(monkeypatch):
+    """Un fallo de pypdf debe convertirse en un error de dominio explícito."""
+
+    class LectorRoto:
+        def __init__(self, *args, **kwargs):
+            raise ValueError("PDF ilegible")
+
+    monkeypatch.setattr("app.services.pdf_extractor.PdfReader", LectorRoto)
+    extractor = PyPDFExtractor()
+
+    with pytest.raises(ExtractionError):
+        extractor.extract(io.BytesIO(b"%PDF-1.4"))
+
+
+def test_extract_pdf_sin_texto_devuelve_vacio(monkeypatch):
+    """Si la lectura funciona pero no hay texto, el extractor devuelve una cadena vacía."""
+
+    class PaginaVacia:
+        def extract_text(self):
+            return ""
+
+    class LectorVacio:
+        def __init__(self, *args, **kwargs):
+            self.pages = [PaginaVacia()]
+
+    monkeypatch.setattr("app.services.pdf_extractor.PdfReader", LectorVacio)
+    extractor = PyPDFExtractor()
+
+    assert extractor.extract(io.BytesIO(b"%PDF-1.4")) == ""
+
+
 def test_format_page_to_markdown():
     """Verifica la conversion estructurada a Markdown."""
     extractor = PyPDFExtractor()
-    texto_ejemplo = "TITULO PRINCIPAL:\n- Elemento 1\n- Elemento 2\nTexto normal del parrafo."
+    texto_ejemplo = (
+        "TITULO PRINCIPAL:\n- Elemento 1\n- Elemento 2\nTexto normal del parrafo."
+    )
     markdown = extractor._format_page_to_markdown(texto_ejemplo, 1)
 
     assert "## Página 1" in markdown
@@ -70,7 +108,9 @@ def test_calculate_checksum_matches_literal():
     content = io.BytesIO(data)
 
     # Hash SHA-256 generado previamente con `hashlib.sha256(data).hexdigest()`
-    expected_literal = "3031af382c85802ddb5f99e73602bf7cef3379374d2dfe5ba1738df3a2c46f5b"
+    expected_literal = (
+        "3031af382c85802ddb5f99e73602bf7cef3379374d2dfe5ba1738df3a2c46f5b"
+    )
     actual = extractor.calculate_checksum(content)
 
     assert actual == expected_literal

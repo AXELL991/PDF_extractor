@@ -128,26 +128,15 @@ una sola vez y las variables ya definidas en el proceso tienen prioridad.
 | `ENVIRONMENT` | Entorno de ejecución (`development`/`production`). | `production` |
 | `MONGO_URI` | URI de conexión a MongoDB. | `mongodb://localhost:27017` |
 | `MONGO_DB_NAME` | Nombre de la base. | `pdf_extractor_db` |
-| `SESSION_SECRET_KEY` | Secreto de `SessionMiddleware`. | **Obligatorio en producción** |
-| `ENFORCE_IP_VALIDATION` | Activa la allowlist de IP en el middleware. | `false` |
 | `MAX_FILE_SIZE_MB` | Límite de tamaño en MB. | `5` |
 | `MAX_FILE_SIZE_BYTES` | Límite derivado en bytes. | `MAX_FILE_SIZE_MB * 1024 * 1024` |
 | `ALLOWED_ORIGINS` | Orígenes CORS permitidos. | Lista explícita |
 | `ALLOWED_HOSTS` | Hosts válidos para `TrustedHostMiddleware`. | Lista explícita |
 
-### Fail-fast de producción
+### Validación de configuración
 
-`app/main.py` llama a `get_session_secret_key()` al importar el composition root. Si
-`ENVIRONMENT=production` y `SESSION_SECRET_KEY` no está definida, la aplicación falla
-al iniciar con `RuntimeError`. En `development` se permite un fallback aleatorio.
-
-### Validación de IP y Traefik
-
-`ENFORCE_IP_VALIDATION` es una defensa **opt-in**. Detrás de Traefik,
-`request.client.host` puede ser la IP del proxy, no la del cliente; por eso la
-aplicación **no confía ciegamente en `X-Forwarded-For`**. La feature está pensada para
-despliegues directos o para una configuración explícita de proxies confiables. Si se
-despliega detrás de Traefik y no se configura esa confianza, debe permanecer desactivada.
+`app/main.py` llama a `validate_config()` al importar el composition root. La función
+falla rápido con `RuntimeError` si `MAX_FILE_SIZE_MB` no es un entero positivo.
 
 ---
 
@@ -167,7 +156,7 @@ uv sync
 
 # 2. Crear configuración local
 cp .env.example .env
-# Editar .env: ENVIRONMENT=development y SESSION_SECRET_KEY=<secreto local>
+# Editar .env: ENVIRONMENT=development
 
 # 3. Ejecutar la suite
 uv run pytest -q
@@ -196,8 +185,8 @@ docker compose up --build -d
 - Dashboard de Traefik: `http://localhost:8080`
 - MongoDB: `localhost:27017`
 
-Para producción, definir `SESSION_SECRET_KEY` en el entorno antes de levantar los
-contenedores; de lo contrario la API falla rápido.
+Para producción, definir `ENVIRONMENT=production` y el resto de variables de
+configuración antes de levantar los contenedores.
 
 ---
 

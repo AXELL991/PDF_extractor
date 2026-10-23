@@ -126,10 +126,16 @@ def build_router() -> APIRouter:
         """Recibe un PDF y delega validación, extracción y persistencia."""
         logger.info(f"Iniciando upload de archivo: {file.filename}")
         contents = await file.read()
-        return use_case.execute(
+        resultado = use_case.execute(
             filename=file.filename or "",
             content_bytes=contents,
             file_size=file.size,
+        )
+        return UploadResponse(
+            status="success",
+            message="Documento procesado y guardado correctamente.",
+            filename=resultado.filename,
+            sha256=resultado.sha256,
         )
 
     @router.get(
@@ -174,7 +180,9 @@ def build_router() -> APIRouter:
         checksum: str,
         request: Request,
         datos: ActualizarRequest,
-        use_case: ActualizarDocumentoUseCase = Depends(get_actualizar_documento_use_case),
+        use_case: ActualizarDocumentoUseCase = Depends(
+            get_actualizar_documento_use_case
+        ),
     ) -> MensajeResponse:
         """Permite corregir el nombre de un archivo que ya fue guardado."""
         nuevo_nombre = use_case.execute(checksum, datos.nuevo_nombre)

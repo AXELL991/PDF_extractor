@@ -5,9 +5,8 @@ import os
 import pytest
 
 # La configuración debe leerse antes de importar `app.main` o `app.core.config`.
-# En tests usamos desarrollo y un secreto explícito para no depender del host.
+# En tests usamos desarrollo para no depender del entorno del host.
 os.environ.setdefault("ENVIRONMENT", "development")
-os.environ.setdefault("SESSION_SECRET_KEY", "test-session-secret")
 
 from app.core.rate_limit import limiter  # noqa: E402
 
@@ -22,9 +21,7 @@ def desactivar_rate_limiting():
 
 def crear_pdf_con_texto(texto: str = "Hola PDF de prueba") -> bytes:
     """Genera un PDF mínimo válido con una página y texto extraíble."""
-    texto_pdf = (
-        texto.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-    )
+    texto_pdf = texto.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
     objetos = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",

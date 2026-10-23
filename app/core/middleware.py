@@ -1,13 +1,11 @@
-"""Middlewares HTTP: cabeceras de seguridad, validación de IP y logging."""
+"""Middlewares HTTP: cabeceras de seguridad y logging."""
 
 import logging
 import time
 
 from fastapi import Request
-from fastapi.responses import JSONResponse
 
-from app.core.config import ENFORCE_IP_VALIDATION
-from app.core.security import generate_csrf_token, is_safe_ip
+from app.core.security import generate_request_id
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +35,7 @@ DOCS_CONTENT_SECURITY_POLICY = (
 
 
 async def security_middleware(request: Request, call_next):
-    """Aplica cabeceras de seguridad, valida la IP de origen y loguea la request."""
+    """Aplica cabeceras de seguridad y loguea la request."""
     start_time = time.time()
     client_ip = request.client.host if request.client else "unknown"
 
@@ -50,15 +48,6 @@ async def security_middleware(request: Request, call_next):
         },
     )
 
-    # Validar IP contra redes seguras (opcional, configurable en config.py)
-    if ENFORCE_IP_VALIDATION:
-        if not is_safe_ip(client_ip):
-            logger.warning(f"IP no autorizada: {client_ip}")
-            return JSONResponse(
-                status_code=403,
-                content={"detail": "Acceso denegado desde esta IP"},
-            )
-
     response = await call_next(request)
 
     for header, value in SECURITY_HEADERS.items():
@@ -69,7 +58,7 @@ async def security_middleware(request: Request, call_next):
         response.headers["Content-Security-Policy"] = DOCS_CONTENT_SECURITY_POLICY
 
     process_time = time.time() - start_time
-    response.headers["X-Request-ID"] = generate_csrf_token()[:16]
+    response.headers["X-Request-ID"] = generate_request_id()[:16]
     response.headers["X-Response-Time"] = str(round(process_time, 4))
 
     logger.info(

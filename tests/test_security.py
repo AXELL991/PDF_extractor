@@ -5,8 +5,7 @@ application server or database.
 
 import pytest
 from app.core.security import (
-    generate_csrf_token,
-    is_safe_ip,
+    generate_request_id,
     is_valid_pdf,
     sanitize_filename,
     sanitize_text,
@@ -19,7 +18,7 @@ from app.core.security import (
     [
         ("documento.pdf", "documento.pdf"),
         ("../escape.pdf", "escape.pdf"),  # path traversal stripped
-        ("mal<script>.pdf", "mal.pdf"),   # HTML stripped
+        ("mal<script>.pdf", "mal.pdf"),  # HTML stripped
     ],
 )
 def test_sanitize_filename_valid(filename, expected):
@@ -31,6 +30,10 @@ def test_sanitize_filename_invalid():
         sanitize_filename("archivo.exe")  # not a .pdf extension
     with pytest.raises(ValueError):
         sanitize_filename("")  # empty string
+
+
+def test_sanitize_filename_quita_puntos_y_espacios_extremos():
+    assert sanitize_filename("  .documento.pdf.  ") == "documento.pdf"
 
 
 @pytest.mark.parametrize(
@@ -51,11 +54,20 @@ def test_validate_checksum(checksum, valid):
             validate_checksum(checksum)
 
 
+def test_validate_checksum_rechaza_no_string():
+    with pytest.raises(ValueError):
+        validate_checksum(123)
+
+
 def test_sanitize_text_removes_html():
     resultado = sanitize_text("<script>alert('xss')</script>Hola <b>mundo</b>")
     assert "<script>" not in resultado
     assert "<b>" not in resultado
     assert "Hola" in resultado
+
+
+def test_sanitize_text_vacio_devuelve_vacio():
+    assert sanitize_text("") == ""
 
 
 def test_is_valid_pdf_true(pdf_con_texto):
@@ -74,31 +86,15 @@ def test_is_valid_pdf_rejects_empty_content():
     assert not is_valid_pdf(b"")
 
 
-@pytest.mark.parametrize(
-    "client_ip,expected",
-    [
-        ("127.0.0.1", True),
-        ("10.1.2.3", True),
-        ("172.16.0.1", True),
-        ("192.168.1.25", True),
-        ("::1", True),
-        ("8.8.8.8", False),
-        ("172.32.0.1", False),
-        ("no-es-una-ip", False),
-    ],
-)
-def test_is_safe_ip_default_networks(client_ip, expected):
-    assert is_safe_ip(client_ip) is expected
-
-
-def test_is_safe_ip_custom_networks():
-    assert is_safe_ip("203.0.113.10", ["203.0.113.0/24"])
-    assert not is_safe_ip("198.51.100.10", ["203.0.113.0/24"])
-
-
-def test_generate_csrf_token_es_unico_y_seguro():
-    primero = generate_csrf_token()
-    segundo = generate_csrf_token()
+def test_generate_request_id_es_unico_y_seguro():
+    primero = generate_request_id()
+    segundo = generate_request_id()
 
     assert primero != segundo
     assert len(primero) >= 32
+
+
+def test_generate_request_id_es_urlsafe():
+    request_id = generate_request_id()
+
+    assert request_id.replace("-", "").replace("_", "").isalnum()
