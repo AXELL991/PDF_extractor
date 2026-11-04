@@ -12,13 +12,13 @@ services:
     container_name: pdf-extractor-traefik
     restart: unless-stopped
     command:
-      - "--api.insecure=true"                           # Dashboard UI activo en :8080
+      - "--api.insecure=true"                           # Dashboard UI activo en :8088
       - "--providers.docker=true"                       # Lee labels de Docker
       - "--providers.docker.exposedbydefault=false"     # Solo expone contenedores con traefik.enable=true
       - "--entrypoints.web.address=:80"                 # Entrada HTTP principal
     ports:
       - "80:80"        # Entrada unificada para la API
-      - "8080:8080"    # Dashboard web interactivo de Traefik
+      - "8088:8080"    # Mapea el 8088 de la PC al 8080 interno del contenedor
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:

@@ -10,6 +10,8 @@ import time
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse
 
+from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
+
 from app.api.dependencies import (
     get_actualizar_documento_use_case,
     get_eliminar_documento_use_case,
@@ -20,7 +22,7 @@ from app.api.dependencies import (
 )
 from app.core.config import ENVIRONMENT
 from app.core.rate_limit import limiter
-from app.database import MongoRepository
+from app.database import MongoDocumentRepository
 from app.dtos import (
     ActualizarRequest,
     DocumentoResponse,
@@ -73,7 +75,7 @@ def build_router() -> APIRouter:
     @limiter.limit("30/minute")
     async def health_check(
         request: Request,
-        repositorio: MongoRepository = Depends(get_repositorio),
+        repositorio: MongoDocumentRepository = Depends(get_repositorio),
     ):
         """Devuelve el estado del sistema sin exponer información sensible."""
         health_status = {
@@ -86,8 +88,8 @@ def build_router() -> APIRouter:
         try:
             repositorio.ping()
             health_status["database"] = "connected"
-        except Exception as e:
-            logger.error(f"Error de conexión a MongoDB: {e}")
+        except (PyMongoError, ServerSelectionTimeoutError) as exc:
+            logger.error(f"Error de conexión a MongoDB: {exc}")
             health_status["status"] = "unhealthy"
             health_status["database"] = "disconnected"
             return JSONResponse(status_code=503, content=health_status)

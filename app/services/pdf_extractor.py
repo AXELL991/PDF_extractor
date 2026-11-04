@@ -3,6 +3,7 @@ import logging
 import re
 
 from pypdf import PdfReader
+from pypdf.errors import PdfReadError, PyPdfError
 
 from app.exceptions import ExtractionError
 
@@ -25,7 +26,7 @@ class PyPDFExtractor:
                     markdown_pages.append(page_markdown)
 
             return "\n\n---\n\n".join(markdown_pages).strip()
-        except Exception as exc:
+        except (PyPdfError, PdfReadError) as exc:
             logger.error(f"Error en la extracción a Markdown: {exc}", exc_info=True)
             raise ExtractionError() from exc
 

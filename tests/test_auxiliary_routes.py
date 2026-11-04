@@ -1,6 +1,7 @@
 """Tests de contrato para endpoints auxiliares y health checks."""
 
 from fastapi.testclient import TestClient
+from pymongo.errors import ServerSelectionTimeoutError
 
 from tests.fakes import FakeRepo, build_test_app
 
@@ -28,7 +29,7 @@ class TestHealthEndpoint:
         assert fake_repo.llamadas == [("ping",)]
 
     def test_health_503_cuando_ping_falla(self):
-        repo = FakeRepo(ping_error=RuntimeError("Mongo no disponible"))
+        repo = FakeRepo(ping_error=ServerSelectionTimeoutError("Mongo no disponible"))
 
         response = client_for(repo).get("/health")
 

@@ -74,6 +74,25 @@ class TestCreate:
         assert response.status_code == 409
         assert fake_db.guardado is None
 
+    def test_upload_pdf_valido_pero_extraccion_falla(self, pdf_con_texto):
+        """El endpoint debe devolver 422 cuando el extractor lanza ExtractionError."""
+
+        class ExtractorRoto:
+            def extract(self, file_stream):
+                from app.exceptions import ExtractionError
+
+                raise ExtractionError()
+
+        repo = FakeRepo()
+        app = build_test_app(repositorio=repo, extractor=ExtractorRoto())
+        client = TestClient(app, base_url="http://localhost")
+
+        files = {"file": ("test.pdf", pdf_con_texto, "application/pdf")}
+        response = client.post("/upload", files=files)
+
+        assert response.status_code == 422
+        assert repo.guardado is None
+
 
 class TestRead:
     """Tests for GET endpoints."""
@@ -145,6 +164,14 @@ class TestUpdate:
         )
         assert response.status_code == 404
 
+    def test_update_document_invalid_checksum(self):
+        response = client_for(FakeRepo()).put(
+            "/documentos/123",
+            json={"nuevo_nombre": "nuevo.pdf"},
+        )
+        assert response.status_code == 400
+        assert "checksum" in response.json()["detail"].lower()
+
 
 class TestDelete:
     """Tests for the DELETE endpoint."""
@@ -166,3 +193,8 @@ class TestDelete:
     def test_delete_document_not_found(self):
         response = client_for(FakeRepo()).delete(f"/documentos/{CHECKSUM_INEXISTENTE}")
         assert response.status_code == 404
+
+    def test_delete_document_invalid_checksum(self):
+        response = client_for(FakeRepo()).delete("/documentos/123")
+        assert response.status_code == 400
+        assert "checksum" in response.json()["detail"].lower()

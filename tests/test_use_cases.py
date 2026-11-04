@@ -154,6 +154,21 @@ class TestProcesarDocumentoUseCase:
         assert extractor.llamadas == []
         assert repo.guardado is None
 
+    def test_archivo_excedido_sin_file_size_usa_len_de_content_bytes(self):
+        """Cuando file_size es None, el caso de uso calcula len(content_bytes)."""
+        repo = FakeRepo()
+        extractor = FakeExtractor(llamadas=repo.llamadas)
+        use_case = self._use_case(repo, extractor)
+
+        contenido_grande = b"x" * (MAX_FILE_SIZE_BYTES + 1)
+
+        with pytest.raises(TamañoExcedidoError):
+            use_case.execute("test.pdf", contenido_grande, file_size=None)
+
+        assert repo.llamadas == []
+        assert extractor.llamadas == []
+        assert repo.guardado is None
+
     def test_pdf_corrupto_no_toca_dependencias(self):
         repo = FakeRepo()
         extractor = FakeExtractor(llamadas=repo.llamadas)

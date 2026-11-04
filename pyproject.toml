@@ -7,7 +7,8 @@ requires-python = ">=3.11"
 dependencies = [
     "pypdf>=4.0.0",              # Para la extracción de contenido del PDF a Markdown
     "pymongo>=4.6.0",            # Para la conexión con la base de datos NoSQL
-    "python-dotenv>=1.0.0",      # Para gestionar configuraciones vía entorno (12 Factor)
+    "python-dotenv>=1.0.0",      # Para cargar variables de entorno desde .env
+    "pydantic-settings>=2.3.0",  # Configuración 12-Factor vía BaseSettings
     "fastapi>=0.136.0",
     "uvicorn>=0.44.0",
     "python-multipart>=0.0.27",  # Requerido por FastAPI para el upload multipart

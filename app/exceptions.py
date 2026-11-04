@@ -1,6 +1,6 @@
 """Excepciones personalizadas del dominio."""
 
-from app.core.config import MAX_FILE_SIZE_MB
+from typing import Optional
 
 
 class DomainException(Exception):
@@ -22,9 +22,8 @@ class FormatoInvalidoError(DomainException):
 class TamañoExcedidoError(DomainException):
     """El archivo supera el tamaño maximo permitido."""
 
-    def __init__(self, max_size_mb: int | None = None):
-        limite = MAX_FILE_SIZE_MB if max_size_mb is None else max_size_mb
-        message = f"El archivo supera los {limite}MB."
+    def __init__(self, max_size_mb: int = 5):
+        message = f"El archivo supera los {max_size_mb}MB."
         super().__init__(message, status_code=413)
 
 

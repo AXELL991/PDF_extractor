@@ -25,7 +25,7 @@ from app.core.exception_handlers import domain_exception_handler
 from app.core.logging_config import setup_logging
 from app.core.middleware import security_middleware
 from app.core.rate_limit import limiter
-from app.database import MongoRepository
+from app.database import MongoDocumentRepository
 from app.exceptions import DomainException
 from app.services.checksum import ChecksumCalculator
 from app.services.pdf_extractor import PyPDFExtractor
@@ -45,14 +45,14 @@ class AplicacionExtractor(FastAPI):
 
 
 def create_app(
-    repositorio: MongoRepository | None = None,
+    repositorio: MongoDocumentRepository | None = None,
     extractor: PyPDFExtractor | None = None,
 ) -> FastAPI:
     """Construye la aplicación e inyecta sus dependencias.
 
     Args:
         repositorio: Adaptador de persistencia. Si es ``None`` se usa
-            ``MongoRepository``.
+            ``MongoDocumentRepository``.
         extractor: Adaptador de extracción. Si es ``None`` se usa
             ``PyPDFExtractor``.
     """
@@ -83,7 +83,7 @@ def create_app(
 
     # Dependencias publicadas para los proveedores de `app.api.dependencies`.
     aplicacion.state.repositorio = (
-        repositorio if repositorio is not None else MongoRepository()
+        repositorio if repositorio is not None else MongoDocumentRepository()
     )
     aplicacion.state.extractor = (
         extractor if extractor is not None else PyPDFExtractor()

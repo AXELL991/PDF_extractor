@@ -7,6 +7,7 @@ import pytest
 from app.exceptions import ExtractionError
 from app.services.checksum import ChecksumCalculator
 from app.services.pdf_extractor import PyPDFExtractor
+from pypdf.errors import PyPdfError
 
 
 def test_extract_text_from_pdf(pdf_con_texto):
@@ -23,7 +24,7 @@ def test_extract_lanza_error_ante_fallo_de_lectura(monkeypatch):
 
     class LectorRoto:
         def __init__(self, *args, **kwargs):
-            raise ValueError("PDF ilegible")
+            raise PyPdfError("PDF ilegible")
 
     monkeypatch.setattr("app.services.pdf_extractor.PdfReader", LectorRoto)
     extractor = PyPDFExtractor()

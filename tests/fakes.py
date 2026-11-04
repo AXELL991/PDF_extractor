@@ -3,10 +3,11 @@
 from dataclasses import replace
 
 from app.domain.entities import Documento
+from app.domain.ports import DocumentRepositoryABC
 from app.main import create_app
 
 
-class FakeRepo:
+class FakeRepo(DocumentRepositoryABC):
     """Repositorio en memoria que registra llamadas y respeta el contrato real."""
 
     def __init__(self, documentos: list[Documento] | None = None, ping_error=None):

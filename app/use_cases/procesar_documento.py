@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from app.core.config import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
 from app.core.security import is_valid_pdf, sanitize_filename, sanitize_text
-from app.database import MongoRepository
 from app.domain.entities import Documento
+from app.domain.ports import DocumentRepositoryABC
 from app.exceptions import (
     DocumentoDuplicadoError,
     FormatoInvalidoError,
@@ -52,7 +52,7 @@ class ProcesarDocumentoUseCase:
     def __init__(
         self,
         extractor: PyPDFExtractor,
-        db: MongoRepository,
+        db: DocumentRepositoryABC,
         checksum_calculator: ChecksumCalculator,
     ):
         self.extractor = extractor

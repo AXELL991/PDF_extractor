@@ -7,7 +7,8 @@ uso por request con esas dependencias, sin mutar instancias compartidas.
 
 from fastapi import Depends, Request
 
-from app.database import MongoRepository
+from app.database import MongoDocumentRepository
+from app.domain.ports import DocumentRepositoryABC
 from app.services.checksum import ChecksumCalculator
 from app.services.pdf_extractor import PyPDFExtractor
 from app.use_cases.gestionar_documentos import (
@@ -19,7 +20,7 @@ from app.use_cases.gestionar_documentos import (
 from app.use_cases.procesar_documento import ProcesarDocumentoUseCase
 
 
-def get_repositorio(request: Request) -> MongoRepository:
+def get_repositorio(request: Request) -> DocumentRepositoryABC:
     """Devuelve el repositorio configurado en el composition root."""
     repositorio = getattr(request.app.state, "repositorio", None)
     if repositorio is None:
@@ -46,31 +47,31 @@ def get_checksum_calculator(request: Request) -> ChecksumCalculator:
 
 
 def get_listar_documentos_use_case(
-    repositorio: MongoRepository = Depends(get_repositorio),
+    repositorio: DocumentRepositoryABC = Depends(get_repositorio),
 ) -> ListarDocumentosUseCase:
     return ListarDocumentosUseCase(repositorio)
 
 
 def get_obtener_documento_use_case(
-    repositorio: MongoRepository = Depends(get_repositorio),
+    repositorio: DocumentRepositoryABC = Depends(get_repositorio),
 ) -> ObtenerDocumentoUseCase:
     return ObtenerDocumentoUseCase(repositorio)
 
 
 def get_actualizar_documento_use_case(
-    repositorio: MongoRepository = Depends(get_repositorio),
+    repositorio: DocumentRepositoryABC = Depends(get_repositorio),
 ) -> ActualizarDocumentoUseCase:
     return ActualizarDocumentoUseCase(repositorio)
 
 
 def get_eliminar_documento_use_case(
-    repositorio: MongoRepository = Depends(get_repositorio),
+    repositorio: DocumentRepositoryABC = Depends(get_repositorio),
 ) -> EliminarDocumentoUseCase:
     return EliminarDocumentoUseCase(repositorio)
 
 
 def get_procesar_documento_use_case(
-    repositorio: MongoRepository = Depends(get_repositorio),
+    repositorio: DocumentRepositoryABC = Depends(get_repositorio),
     extractor: PyPDFExtractor = Depends(get_extractor),
     checksum_calculator: ChecksumCalculator = Depends(get_checksum_calculator),
 ) -> ProcesarDocumentoUseCase:

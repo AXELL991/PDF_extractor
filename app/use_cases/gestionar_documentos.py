@@ -6,8 +6,8 @@ petición y la respuesta.
 """
 
 from app.core.security import sanitize_filename, validate_checksum
-from app.database import MongoRepository
 from app.domain.entities import Documento
+from app.domain.ports import DocumentRepositoryABC
 from app.exceptions import (
     ChecksumInvalidoError,
     DocumentoNoEncontradoError,
@@ -15,7 +15,9 @@ from app.exceptions import (
 )
 
 
-def _obtener_documento(repositorio: MongoRepository, checksum: str) -> Documento:
+def _obtener_documento(
+    repositorio: DocumentRepositoryABC, checksum: str
+) -> Documento:
     """Valida el checksum y devuelve el documento o lanza el error de dominio."""
     try:
         validate_checksum(checksum)
@@ -31,7 +33,7 @@ def _obtener_documento(repositorio: MongoRepository, checksum: str) -> Documento
 class ListarDocumentosUseCase:
     """Devuelve todos los documentos persistidos."""
 
-    def __init__(self, repositorio: MongoRepository):
+    def __init__(self, repositorio: DocumentRepositoryABC):
         self.repositorio = repositorio
 
     def execute(self) -> list[Documento]:
@@ -41,7 +43,7 @@ class ListarDocumentosUseCase:
 class ObtenerDocumentoUseCase:
     """Obtiene un documento por su checksum."""
 
-    def __init__(self, repositorio: MongoRepository):
+    def __init__(self, repositorio: DocumentRepositoryABC):
         self.repositorio = repositorio
 
     def execute(self, checksum: str) -> Documento:
@@ -51,7 +53,7 @@ class ObtenerDocumentoUseCase:
 class ActualizarDocumentoUseCase:
     """Actualiza el nombre de un documento existente."""
 
-    def __init__(self, repositorio: MongoRepository):
+    def __init__(self, repositorio: DocumentRepositoryABC):
         self.repositorio = repositorio
 
     def execute(self, checksum: str, nuevo_nombre: str) -> str:
@@ -68,7 +70,7 @@ class ActualizarDocumentoUseCase:
 class EliminarDocumentoUseCase:
     """Elimina un documento existente."""
 
-    def __init__(self, repositorio: MongoRepository):
+    def __init__(self, repositorio: DocumentRepositoryABC):
         self.repositorio = repositorio
 
     def execute(self, checksum: str) -> None:

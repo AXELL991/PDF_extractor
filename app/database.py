@@ -4,6 +4,7 @@ from pymongo import MongoClient
 
 from app.core.config import MONGO_DB_NAME, MONGO_URI
 from app.domain.entities import Documento
+from app.domain.ports import DocumentRepositoryABC
 
 
 def _a_documento(doc: dict) -> Documento:
@@ -15,12 +16,12 @@ def _a_documento(doc: dict) -> Documento:
     )
 
 
-class MongoRepository:
-    """Adaptador de persistencia: traduce entre MongoDB y el dominio."""
+class MongoDocumentRepository:
+    """Adaptador de persistencia concreto para MongoDB."""
 
-    def __init__(self):
-        self.client = MongoClient(MONGO_URI)
-        self.db = self.client[MONGO_DB_NAME]
+    def __init__(self, client: MongoClient | None = None, db_name: str | None = None):
+        self.client = client or MongoClient(MONGO_URI)
+        self.db = self.client[db_name or MONGO_DB_NAME]
         self.coleccion = self.db["documentos"]
 
     def obtener_por_checksum(self, checksum: str) -> Documento | None:
@@ -50,3 +51,7 @@ class MongoRepository:
     def ping(self) -> None:
         """Comprueba la conectividad con MongoDB."""
         self.client.admin.command("ping")
+
+
+# Alias de compatibilidad para imports existentes que esperaban MongoRepository.
+MongoRepository = MongoDocumentRepository

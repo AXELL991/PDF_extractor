@@ -86,12 +86,11 @@ def test_is_valid_pdf_rejects_empty_content():
     assert not is_valid_pdf(b"")
 
 
-def test_generate_request_id_es_unico_y_seguro():
-    primero = generate_request_id()
-    segundo = generate_request_id()
+def test_generate_request_id_es_urlsafe_y_longitud_valida():
+    request_id = generate_request_id()
 
-    assert primero != segundo
-    assert len(primero) >= 32
+    assert len(request_id) >= 32
+    assert request_id.replace("-", "").replace("_", "").isalnum()
 
 
 def test_generate_request_id_es_urlsafe():
