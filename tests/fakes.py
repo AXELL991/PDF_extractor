@@ -2,8 +2,14 @@
 
 from dataclasses import replace
 
+from app.core.config import get_settings
 from app.domain.entities import Documento
-from app.domain.ports import DocumentRepositoryABC
+from app.domain.ports import (
+    ChecksumCalculatorABC,
+    DocumentRepositoryABC,
+    PDFExtractorABC,
+    SanitizationServiceABC,
+)
 from app.main import create_app
 
 
@@ -45,7 +51,7 @@ class FakeRepo(DocumentRepositoryABC):
             raise self.ping_error
 
 
-class FakeExtractor:
+class FakeExtractor(PDFExtractorABC):
     """Extractor controlable que registra el orden de sus operaciones."""
 
     def __init__(
@@ -61,7 +67,7 @@ class FakeExtractor:
         return self.texto
 
 
-class FakeChecksumCalculator:
+class FakeChecksumCalculator(ChecksumCalculatorABC):
     """Calculador de checksum controlable para tests de aplicación."""
 
     def __init__(
@@ -77,13 +83,47 @@ class FakeChecksumCalculator:
         return self.checksum
 
 
+class FakeSanitization(SanitizationServiceABC):
+    """Servicio de sanitización controlable para tests de aplicación."""
+
+    def __init__(
+        self,
+        llamadas: list[tuple] | None = None,
+        validate_pdf_result: bool = True,
+    ):
+        self.llamadas = llamadas if llamadas is not None else []
+        self.validate_pdf_result = validate_pdf_result
+
+    def sanitize_filename(self, filename: str) -> str:
+        self.llamadas.append(("sanitize_filename", filename))
+        return filename
+
+    def sanitize_text(self, text: str) -> str:
+        self.llamadas.append(("sanitize_text", text))
+        return text
+
+    def validate_pdf(self, content: bytes) -> bool:
+        self.llamadas.append(("validate_pdf",))
+        return self.validate_pdf_result
+
+    def validate_checksum(self, checksum: str) -> None:
+        self.llamadas.append(("validate_checksum", checksum))
+
+
 def build_test_app(
     repositorio: FakeRepo,
     extractor=None,
     checksum_calculator=None,
+    sanitization=None,
 ):
     """Monta la app real con dependencias de test inyectadas por la factory."""
-    test_app = create_app(repositorio=repositorio, extractor=extractor)
-    if checksum_calculator is not None:
-        test_app.state.checksum_calculator = checksum_calculator
+    settings = get_settings()
+    test_app = create_app(
+        repositorio=repositorio,
+        extractor=extractor,
+        checksum_calculator=checksum_calculator,
+    )
+    if sanitization is not None:
+        test_app.state.sanitization = sanitization
+    test_app.state.max_size_bytes = settings.MAX_FILE_SIZE_BYTES
     return test_app

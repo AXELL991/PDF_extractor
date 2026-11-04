@@ -5,7 +5,7 @@ import re
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError, PyPdfError
 
-from app.exceptions import ExtractionError
+from app.domain.exceptions import ExtractionError
 
 logger = logging.getLogger(__name__)
 

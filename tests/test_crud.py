@@ -79,7 +79,7 @@ class TestCreate:
 
         class ExtractorRoto:
             def extract(self, file_stream):
-                from app.exceptions import ExtractionError
+                from app.domain.exceptions import ExtractionError
 
                 raise ExtractionError()
 

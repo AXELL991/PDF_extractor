@@ -2,8 +2,6 @@
 
 from pydantic import BaseModel, ConfigDict
 
-from app.domain.entities import Documento as DocumentoDominio
-
 
 class DocumentoResponse(BaseModel):
     """Representación HTTP de un documento persistido."""
@@ -44,13 +42,8 @@ class ActualizarRequest(BaseModel):
     nuevo_nombre: str
 
 
-# Alias de compatibilidad para consumidores que importaban la entidad desde
-# este módulo. La entidad real ahora es un dataclass puro de dominio.
-Documento = DocumentoDominio
-
 __all__ = [
     "ActualizarRequest",
-    "Documento",
     "DocumentoResponse",
     "ListaDocumentosResponse",
     "MensajeResponse",

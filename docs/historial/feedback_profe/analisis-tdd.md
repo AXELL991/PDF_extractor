@@ -213,3 +213,23 @@ El proyecto **tiene tests, no practica TDD**. Hay 23 tests, organizados y con un
 ---
 
 *Elaborado con la metodología del skill `tdd` (Tres Leyes, seams, anti-patrones) y el vocabulario de `codebase-design`. Reportes complementarios: `analisis-arquitectura.md`, `analisis-clean-code.md`.*
+
+## 12. Nota metodológica sobre la evidencia histórica de TDD (Primera y Tercera Ley)
+
+### Reconocimiento del hallazgo
+
+El análisis de `analisis-tdd.md` (sección 4, Ley 1 y Ley 3) identifica que los commits históricos iniciales del proyecto combinaron la implementación de código de producción y sus tests en un mismo commit (por ejemplo, `365c753 feat: add main.py` incluía tanto `main.py` como `tests/test_main.py`). Este patrón responde al flujo de desarrollo iterativo temprano del proyecto, en el que la implementación y sus pruebas se crearon de manera conjunta antes de formalizar una disciplina de TDD estricta.
+
+### Imposibilidad de reescritura retroactiva del historial
+
+No es técnicamente apropiado ni éticamente aceptable alterar retroactivamente el historial de Git (mediante rebase interactivo, `filter-repo` o reescritura de commits) para simular un ciclo TDD estricto (Red-Before-Green) que no ocurrió en su momento. Reescribir commits históricos para fingir que los tests precedieron a la implementación constituiría una tergiversación del proceso real de desarrollo y vulneraría la integridad del registro de cambios. El historial de Git debe reflejar fielmente lo que sucedió, no lo que se desearía que hubiera sucedido.
+
+### Compromiso de aplicación futura
+
+A partir de este punto, el proyecto se compromete a aplicar el flujo estricto de TDD —Red (test que falla) → Green (implementación mínima para pasar) → Refactor— de manera verificable para todas las nuevas funcionalidades e iteraciones. Cada nueva capacidad se desarrollará mediante commits atómicos y separados:
+
+1. Un commit que añada únicamente el test que falla (fase Red).
+2. Un commit que implemente el código mínimo para que el test pase (fase Green).
+3. Un commit que realice el refactor sin cambiar el comportamiento (fase Refactor).
+
+Esta separación atómica permite auditar a posteriori el cumplimiento del ciclo TDD y garantiza que cada funcionalidad nueva cuente con evidencia clara de desarrollo guiado por pruebas.

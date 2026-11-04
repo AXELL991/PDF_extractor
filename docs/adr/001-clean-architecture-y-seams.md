@@ -118,15 +118,8 @@ una única fuente: `MAX_FILE_SIZE_MB` / `MAX_FILE_SIZE_BYTES`.
 
 ### 2.6 Decisiones diferidas y límites conscientes
 
-- **No se formalizan `Protocol`s todavía.** El caso de uso usa tipos concretos
-  (`MongoRepository`, `PyPDFExtractor`) porque aún no existe un segundo adaptador real
-  que justifique un puerto formal. Se aplica YAGNI/OCP diferido. Si aparece otro motor
-  de base de datos u otro extractor, se introduce el `Protocol` y se ajusta la
-  inyección.
-- **`MongoRepository.__init__` crea el cliente.** `MongoClient` es lazy y
-  `create_app` es el lugar previsto para construir el adaptador. Si se busca DIP
-  estricto para el driver o se necesita testear el adaptador con un cliente inyectado,
-  se moverá la creación del cliente a `lifespan` o a una factory específica.
+- **Puertos formalizados con `Protocol`.** Existen los contratos de salida en `app/domain/ports.py` (`DocumentRepositoryABC`, `PDFExtractorABC`, `ChecksumCalculatorABC`, `SanitizationServiceABC`). Los casos de uso dependen de estas abstracciones, no de implementaciones concretas. Se mantiene YAGNI para la creación de adaptadores adicionales: si aparece un segundo motor de BD o extractor, ya existe el puerto formal para recibirlo.
+- **`MongoDocumentRepository.__init__` crea el cliente.** `MongoClient` es lazy y `create_app` es el lugar previsto para construir el adaptador. Si se busca DIP estricto para el driver o se necesita testear el adaptador con un cliente inyectado, se moverá la creación del cliente a `lifespan` o a una factory específica.
 ---
 
 ## 3. Consecuencias
@@ -185,7 +178,7 @@ una única fuente: `MAX_FILE_SIZE_MB` / `MAX_FILE_SIZE_BYTES`.
 
 ## 5. Verificación
 
-- `uv run pytest -q` → **78 tests en verde**.
+- `uv run pytest -q` → **94 tests en verde**.
 - `uv run ruff check .` → **All checks passed!**
 - `tests/test_app_factory.py` verifica la inyección explícita de repositorio y extractor.
 - `tests/test_use_cases.py` verifica el seam de aplicación y los casos borde.

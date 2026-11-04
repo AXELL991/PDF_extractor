@@ -10,8 +10,6 @@ import time
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
-
 from app.api.dependencies import (
     get_actualizar_documento_use_case,
     get_eliminar_documento_use_case,
@@ -20,9 +18,9 @@ from app.api.dependencies import (
     get_procesar_documento_use_case,
     get_repositorio,
 )
-from app.core.config import ENVIRONMENT
+from app.core.config import get_settings
 from app.core.rate_limit import limiter
-from app.database import MongoDocumentRepository
+from app.domain.ports import DocumentRepositoryABC
 from app.dtos import (
     ActualizarRequest,
     DocumentoResponse,
@@ -39,6 +37,7 @@ from app.use_cases.gestionar_documentos import (
 from app.use_cases.procesar_documento import ProcesarDocumentoUseCase
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 def build_router() -> APIRouter:
@@ -62,7 +61,7 @@ def build_router() -> APIRouter:
         return {
             "status": "online",
             "message": "API Extractor de PDF lista y conectada a MongoDB",
-            "environment": ENVIRONMENT,
+            "environment": settings.ENVIRONMENT,
             "version": "2.0.0",
         }
 
@@ -75,21 +74,21 @@ def build_router() -> APIRouter:
     @limiter.limit("30/minute")
     async def health_check(
         request: Request,
-        repositorio: MongoDocumentRepository = Depends(get_repositorio),
+        repositorio: DocumentRepositoryABC = Depends(get_repositorio),
     ):
         """Devuelve el estado del sistema sin exponer información sensible."""
         health_status = {
             "status": "healthy",
             "timestamp": int(time.time()),
             "version": "2.0.0",
-            "environment": ENVIRONMENT,
+            "environment": settings.ENVIRONMENT,
         }
 
         try:
             repositorio.ping()
             health_status["database"] = "connected"
-        except (PyMongoError, ServerSelectionTimeoutError) as exc:
-            logger.error(f"Error de conexión a MongoDB: {exc}")
+        except Exception as exc:
+            logger.error(f"Error de conexión a base de datos: {exc}")
             health_status["status"] = "unhealthy"
             health_status["database"] = "disconnected"
             return JSONResponse(status_code=503, content=health_status)

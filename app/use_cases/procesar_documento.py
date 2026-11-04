@@ -1,23 +1,27 @@
-"""Caso de uso para procesar y persistir documentos PDF."""
+"""Caso de uso para procesar y persistir documentos PDF.
+
+Depende exclusivamente de puertos (Protocol) definidos en el dominio,
+sin acoplamiento a implementaciones concretas de infraestructura.
+"""
 
 import io
 from dataclasses import dataclass
 
-from app.core.config import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB
-from app.core.security import is_valid_pdf, sanitize_filename, sanitize_text
 from app.domain.entities import Documento
-from app.domain.ports import DocumentRepositoryABC
-from app.exceptions import (
+from app.domain.exceptions import (
     DocumentoDuplicadoError,
     FormatoInvalidoError,
     NombreArchivoInvalidoError,
     TamañoExcedidoError,
 )
-from app.services.checksum import ChecksumCalculator
-from app.services.pdf_extractor import PyPDFExtractor
+from app.domain.ports import (
+    ChecksumCalculatorABC,
+    DocumentRepositoryABC,
+    PDFExtractorABC,
+    SanitizationServiceABC,
+)
 
-# Valor de dominio para PDFs sin texto extraíble. Se mantiene el literal
-# histórico para no cambiar el contrato de la API.
+# Valor de dominio para PDFs sin texto extraíble.
 TEXTO_VACIO = "Vacio"
 
 
@@ -30,7 +34,9 @@ class ResultadoDocumento:
 
 
 def validar_tamano_archivo(
-    file_size: int | None, content_bytes: bytes | None = None
+    file_size: int | None,
+    content_bytes: bytes | None,
+    max_size_bytes: int,
 ) -> None:
     """Valida que el tamaño del archivo no exceda el límite permitido.
 
@@ -42,8 +48,8 @@ def validar_tamano_archivo(
     elif size is not None and content_bytes is not None:
         size = max(size, len(content_bytes))
 
-    if (size or 0) > MAX_FILE_SIZE_BYTES:
-        raise TamañoExcedidoError(MAX_FILE_SIZE_MB)
+    if (size or 0) > max_size_bytes:
+        raise TamañoExcedidoError()
 
 
 class ProcesarDocumentoUseCase:
@@ -51,13 +57,17 @@ class ProcesarDocumentoUseCase:
 
     def __init__(
         self,
-        extractor: PyPDFExtractor,
+        extractor: PDFExtractorABC,
         db: DocumentRepositoryABC,
-        checksum_calculator: ChecksumCalculator,
+        checksum_calculator: ChecksumCalculatorABC,
+        sanitization: SanitizationServiceABC,
+        max_size_bytes: int,
     ):
         self.extractor = extractor
         self.db = db
         self.checksum_calculator = checksum_calculator
+        self.sanitization = sanitization
+        self.max_size_bytes = max_size_bytes
 
     def execute(
         self,
@@ -66,10 +76,10 @@ class ProcesarDocumentoUseCase:
         file_size: int | None = None,
     ) -> ResultadoDocumento:
         """Valida el PDF, extrae su texto y lo guarda en la base de datos."""
-        validar_tamano_archivo(file_size, content_bytes)
+        validar_tamano_archivo(file_size, content_bytes, self.max_size_bytes)
         nombre_sanitizado = self._sanitizar_nombre(filename)
 
-        if not is_valid_pdf(content_bytes):
+        if not self.sanitization.validate_pdf(content_bytes):
             raise FormatoInvalidoError("El archivo no es un PDF válido.")
 
         checksum = self.checksum_calculator.calculate(content_bytes)
@@ -77,7 +87,7 @@ class ProcesarDocumentoUseCase:
 
         archivo_en_ram = io.BytesIO(content_bytes)
         texto_extraido = self.extractor.extract(archivo_en_ram)
-        texto_seguro = sanitize_text(texto_extraido)
+        texto_seguro = self.sanitization.sanitize_text(texto_extraido)
 
         self.db.guardar_documento(
             Documento(
@@ -95,7 +105,7 @@ class ProcesarDocumentoUseCase:
     def _sanitizar_nombre(self, filename: str) -> str:
         """Sanitiza y valida que el nombre corresponda a un PDF."""
         try:
-            return sanitize_filename(filename)
+            return self.sanitization.sanitize_filename(filename)
         except ValueError as exc:
             raise NombreArchivoInvalidoError(str(exc)) from exc
 

@@ -4,7 +4,7 @@ import io
 
 import pytest
 
-from app.exceptions import ExtractionError
+from app.domain.exceptions import ExtractionError
 from app.services.checksum import ChecksumCalculator
 from app.services.pdf_extractor import PyPDFExtractor
 from pypdf.errors import PyPdfError

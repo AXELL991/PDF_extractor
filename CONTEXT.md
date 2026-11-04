@@ -31,9 +31,9 @@ dirigidas hacia el dominio y la capa de aplicación. La regla práctica es:
 
 | Capa | Responsabilidad | Archivos principales |
 |---|---|---|
-| **Dominio** | Entidad pura `Documento` y errores de negocio. No conoce Pydantic, FastAPI ni `pymongo`. | `app/domain/entities.py`, `app/exceptions.py` |
+| **Dominio** | Entidad pura `Documento` y errores de negocio. No conoce Pydantic, FastAPI ni `pymongo`. | `app/domain/entities.py`, `app/domain/exceptions.py` |
 | **Casos de uso / aplicación** | Orquestan validaciones, reglas de existencia, checksum, duplicados, sanitización y persistencia. | `app/use_cases/procesar_documento.py`, `app/use_cases/gestionar_documentos.py` |
-| **Adaptadores de infraestructura** | Implementan la persistencia, la extracción y el cálculo de checksum. | `app/database.py` (`MongoRepository`), `app/services/pdf_extractor.py` (`PyPDFExtractor`), `app/services/checksum.py` (`ChecksumCalculator`) |
+| **Adaptadores de infraestructura** | Implementan la persistencia, la extracción y el cálculo de checksum. | `app/database.py` (`MongoDocumentRepository`), `app/services/pdf_extractor.py` (`PyPDFExtractor`), `app/services/checksum.py` (`ChecksumCalculator`) |
 | **Presentación** | Rutas HTTP, esquemas Pydantic, dependencias de FastAPI, middlewares y mapeo de excepciones a códigos HTTP. | `app/main.py`, `app/api/routes.py`, `app/api/dependencies.py`, `app/dtos.py`, `app/core/` |
 
 ### 2.2 Flujo de una subida (`POST /upload`)
@@ -198,7 +198,7 @@ configuración antes de levantar los contenedores.
 
 ## 7. Estado de pruebas y TDD
 
-- Suite actual: **78 tests**, ejecutada con `uv run pytest -q`.
+- Suite actual: **94 tests**, ejecutada con `uv run pytest -q`.
 - Linter: `uv run ruff check .` sin observaciones.
 - Los tests unitarios usan `FakeRepo`/`FakeExtractor`/`FakeChecksumCalculator` y no tocan MongoDB ni archivos.
 - Para cada nueva funcionalidad, el proceso acordado es: **test rojo → implementación

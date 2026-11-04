@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from app.domain.exceptions import DocumentoInvalidoError
+
 
 @dataclass(frozen=True)
 class Documento:
@@ -18,6 +20,6 @@ class Documento:
 
     def __post_init__(self) -> None:
         if not self.archivo:
-            raise ValueError("El nombre del archivo es obligatorio.")
+            raise DocumentoInvalidoError("El nombre del archivo es obligatorio.")
         if not self.hash_seguridad:
-            raise ValueError("El checksum del documento es obligatorio.")
+            raise DocumentoInvalidoError("El checksum del documento es obligatorio.")
